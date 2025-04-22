@@ -1,4 +1,5 @@
 <?php
+session_start();
 require_once __DIR__ . '/../config.php'; // This should handle session initialization
 require_once __DIR__ . '/../functions.php';
 
@@ -8,7 +9,7 @@ if (!isset($_SESSION['user']) || $_SESSION['user']['role'] !== 'doctor') {
 }
 
 
-$doctor_id = getDoctorIdByUserId($_SESSION['user']['id']);
+$some_variable = getDoctorIdByUserId($_SESSION['user']['id'], $conn);
 if (!$doctor_id) {
     header("Location: " . BASE_URL . "/auth.php");
     exit();

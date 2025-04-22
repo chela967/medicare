@@ -54,10 +54,11 @@ section {
 }
 
 /* Chatbot Icon */
+/* Basic styles - adjust as needed */
 .chatbot-icon {
     position: fixed;
-    bottom: 30px;
-    right: 30px;
+    bottom: 20px;
+    right: 20px;
     width: 60px;
     height: 60px;
     display: flex;
@@ -65,8 +66,29 @@ section {
     justify-content: center;
     cursor: pointer;
     z-index: 1000;
-    transition: all 0.3s ease;
 }
+
+#chatbotWindow {
+    position: fixed;
+    bottom: 90px; /* Above the icon */
+    right: 20px;
+    width: 350px;
+    height: 450px; /* Adjust height as needed */
+    z-index: 999;
+    display: none; /* Initially hidden */
+    flex-direction: column; /* Ensure header/body/footer stack */
+}
+
+#chatbotWindow .card-body {
+    overflow-y: auto; /* Allow scrolling for messages */
+    flex-grow: 1; /* Make message area take available space */
+}
+
+/* Styling for chat messages */
+.user-message .bg-primary { float: right; clear: both; }
+.bot-message .bg-light { float: left; clear: both; }
+.user-message, .bot-message { margin-bottom: 10px; overflow: hidden; /* contain floats */ }
+.user-message div, .bot-message div { display: inline-block; max-width: 80%; word-wrap: break-word;}
 
 .chatbot-icon:hover {
     transform: scale(1.1);

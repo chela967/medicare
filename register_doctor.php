@@ -345,4 +345,4 @@ document.getElementById('doctorRegForm').addEventListener('submit', function(e) 
 });
 </script>
 
-<?php include __DIR__ . '/footer.php'; ?>
+<?php require_once 'footer.php'; ?>

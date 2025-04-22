@@ -21,12 +21,24 @@ if (!isset($_SESSION['user'])) {
 }
 
 // Get doctor details
-$doctor_id = getDoctorIdByUserId($_SESSION['user']['id']);
-if (!$doctor_id) {
-    header("Location: ../auth.php");
+$doctor_id = getDoctorIdByUserId($_SESSION['user']['id'], $conn); // Pass $conn
+if (!isset($_SESSION['user']) || $_SESSION['user']['role'] !== 'doctor') {
+    header("Location: ../auth.php"); // Adjust path if needed
     exit();
 }
 
+// --- GET LOGGED-IN DOCTOR'S ID ---
+$logged_in_user_id = $_SESSION['user']['id'];
+// Make sure you pass $conn here
+$logged_in_doctor_id = getDoctorIdByUserId($logged_in_user_id, $conn);
+
+// --- !! ADD THIS CHECK IF YOU DON'T HAVE IT !! ---
+if (!$logged_in_doctor_id) {
+    // Handle the error: Doctor ID lookup failed.
+    error_log("Dashboard Error: Could not retrieve doctor ID for user ID: " . $logged_in_user_id);
+    // Stop the script with an error message
+    die('<div class="alert alert-danger m-4">Error: Unable to load doctor information. Please contact support.</div>');
+}
 $page_title = "Doctor Dashboard - Medicare";
 include '../header.php';
 
@@ -34,11 +46,11 @@ include '../header.php';
 $doctor = getDoctorDetails($doctor_id);
 $today_appointments = getDoctorAppointments($doctor_id, date('Y-m-d'));
 $upcoming_appointments = getUpcomingAppointments($doctor_id, 5);
-$patient_count = getDoctorPatientCount($doctor_id);
+$patient_count = getDoctorPatientCount($logged_in_doctor_id, $conn);
 ?>
 <?php
 // Check for approval notification
-$doctor_id = getDoctorIdByUserId($_SESSION['user']['id']);
+$doctor_id_for_approval = getDoctorIdByUserId($_SESSION['user']['id'], $conn);
 $doctor = getDoctorDetails($doctor_id);
 
 if ($doctor['status'] === 'approved' && !isset($_SESSION['seen_approval_notice'])) {
@@ -244,7 +256,7 @@ if ($doctor['status'] === 'approved' && !isset($_SESSION['seen_approval_notice']
                                             <td><?php echo htmlspecialchars($appointment['patient_name']); ?></td>
                                             <td><?php echo shortenText(htmlspecialchars($appointment['reason']), 30); ?></td>
                                             <td>
-                                                <a href="appointment.php?id=<?php echo $appointment['id']; ?>"
+                                                <a href="appointment_details.php?id=<?php echo $appointment['id']; ?>"
                                                     class="btn btn-sm btn-outline-primary">
                                                     View
                                                 </a>

@@ -154,6 +154,47 @@ function getCategories()
     return $result->fetch_all(MYSQLI_ASSOC);
 }
 
+function getDoctorIdByUserId(int $user_id, mysqli $conn): int|false
+{
+    $sql = "SELECT id FROM doctors WHERE user_id = ? LIMIT 1";
+    $stmt = $conn->prepare($sql);
+    if (!$stmt) {
+        error_log("MySQLi prepare failed (getDoctorIdByUserId): (" . $conn->errno . ") " . $conn->error);
+        return false;
+    }
+
+    // Bind the integer user_id
+    if (!$stmt->bind_param("i", $user_id)) {
+        error_log("MySQLi bind_param failed (getDoctorIdByUserId): (" . $stmt->errno . ") " . $stmt->error);
+        $stmt->close();
+        return false;
+    }
+
+    // Execute
+    if (!$stmt->execute()) {
+        error_log("MySQLi execute failed (getDoctorIdByUserId): (" . $stmt->errno . ") " . $stmt->error);
+        $stmt->close();
+        return false;
+    }
+
+    // Get result
+    $result = $stmt->get_result();
+    if (!$result) {
+        error_log("MySQLi get_result failed (getDoctorIdByUserId): (" . $stmt->errno . ") " . $stmt->error);
+        $stmt->close();
+        return false;
+    }
+
+    // Fetch data
+    $doctor = $result->fetch_assoc();
+
+    // Close statement
+    $stmt->close();
+
+    // Return the ID as integer if found, otherwise false
+    return $doctor ? (int) $doctor['id'] : false;
+}
+
 
 function getUserPrescriptions($user_id)
 {
@@ -724,25 +765,6 @@ function getUpcomingAppointments($doctor_id, $limit = 5)
     return $result->fetch_all(MYSQLI_ASSOC);
 }
 
-function getDoctorPatientCount($doctor_id)
-{
-    global $conn;
-    $query = "SELECT COUNT(DISTINCT patient_id) as count FROM appointments WHERE doctor_id = ?";
-    $stmt = $conn->prepare($query);
-    $stmt->bind_param("i", $doctor_id);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    return $result->fetch_assoc()['count'];
-}
-function getDoctorIdByUserId($user_id)
-{
-    global $conn;
-    $stmt = $conn->prepare("SELECT id FROM doctors WHERE user_id = ?");
-    $stmt->bind_param("i", $user_id);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    return ($result->num_rows > 0) ? $result->fetch_assoc()['id'] : null;
-}
 
 function isUserApprovedDoctor($user_id)
 {
@@ -955,4 +977,385 @@ function deletePatient($patient_id)
         return false;
     }
 }
+
+// Make sure this is inside your functions.php file
+// (You might already have <?php at the top)
+
+/**
+ * Fetches details for a specific appointment using MySQLi, ensuring it belongs to the specified doctor.
+ * Joins with the users table to get patient information.
+ *
+ * @param int $appointment_id The ID of the appointment to fetch.
+ * @param int $doctor_id The ID of the doctor who should own this appointment.
+ * @param mysqli $conn MySQLi database connection object.
+ * @return array|false An associative array with appointment details or false if not found/not authorized/error.
+ */
+function getAppointmentDetailsForDoctor(int $appointment_id, int $doctor_id, mysqli $conn): array|false
+{
+    // SQL query to select appointment details and join with users table for patient info
+    // Ensure the appointment ID and doctor ID match
+    $sql = "SELECT
+                a.id AS appointment_id,
+                a.appointment_date,
+                a.appointment_time,
+                a.reason,
+                a.consultation_fee,
+                a.payment_status,
+                a.payment_method,
+                a.status AS appointment_status,
+                a.notes AS consultation_notes,
+                a.created_at AS appointment_created_at,
+                p.id AS patient_user_id,
+                p.name AS patient_name,
+                p.email AS patient_email,
+                p.phone AS patient_phone
+            FROM
+                appointments a
+            JOIN
+                users p ON a.patient_id = p.id -- Join users table for patient info
+            WHERE
+                a.id = ? -- Placeholder for appointment ID
+            AND
+                a.doctor_id = ? -- Placeholder for doctor ID (Security check)
+            LIMIT 1"; // We only expect one result
+
+    // 1. Prepare statement
+    $stmt = $conn->prepare($sql);
+    if (!$stmt) {
+        // Log error if prepare fails
+        error_log("MySQLi prepare failed in getAppointmentDetailsForDoctor: (" . $conn->errno . ") " . $conn->error);
+        return false; // Return false on prepare error
+    }
+
+    // 2. Bind parameters (use "ii" for two integers: appointment_id, doctor_id)
+    if (!$stmt->bind_param("ii", $appointment_id, $doctor_id)) {
+        // Log error if bind_param fails
+        error_log("MySQLi bind_param failed in getAppointmentDetailsForDoctor: (" . $stmt->errno . ") " . $stmt->error);
+        $stmt->close(); // Close statement before returning
+        return false;
+    }
+
+    // 3. Execute statement
+    if (!$stmt->execute()) {
+        // Log error if execute fails
+        error_log("MySQLi execute failed in getAppointmentDetailsForDoctor: (" . $stmt->errno . ") " . $stmt->error);
+        $stmt->close(); // Close statement before returning
+        return false;
+    }
+
+    // 4. Get result set
+    $result = $stmt->get_result();
+    if (!$result) {
+        // Log error if get_result fails
+        error_log("MySQLi get_result failed in getAppointmentDetailsForDoctor: (" . $stmt->errno . ") " . $stmt->error);
+        $stmt->close(); // Close statement before returning
+        return false;
+    }
+
+    // 5. Fetch data as an associative array
+    $appointment = $result->fetch_assoc(); // Returns array or null if not found
+
+    // 6. Clean up: Close the statement
+    $stmt->close();
+
+    // 7. Return the fetched array (or false if $appointment is null/empty)
+    return $appointment ?: false; // Return false if $appointment is null (not found or no permission)
+}
+
+function getDoctorPatientCount(int $doctor_id, mysqli $conn): int
+{
+    // SQL to count distinct patient IDs from appointments for the given doctor
+    $sql = "SELECT COUNT(DISTINCT patient_id) AS total_patients FROM appointments WHERE doctor_id = ?";
+
+    $count = 0; // Default count
+
+    // Prepare statement
+    $stmt = $conn->prepare($sql);
+    if (!$stmt) {
+        error_log("MySQLi prepare failed in getDoctorPatientCount: (" . $conn->errno . ") " . $conn->error);
+        return $count; // Return 0 on error
+    }
+
+    // Bind parameter
+    if (!$stmt->bind_param("i", $doctor_id)) {
+        error_log("MySQLi bind_param failed in getDoctorPatientCount: (" . $stmt->errno . ") " . $stmt->error);
+        $stmt->close();
+        return $count;
+    }
+
+    // Execute
+    if (!$stmt->execute()) {
+        error_log("MySQLi execute failed in getDoctorPatientCount: (" . $stmt->errno . ") " . $stmt->error);
+        $stmt->close();
+        return $count;
+    }
+
+    // Get result
+    $result = $stmt->get_result();
+    if (!$result) {
+        error_log("MySQLi get_result failed in getDoctorPatientCount: (" . $stmt->errno . ") " . $stmt->error);
+        $stmt->close();
+        return $count;
+    }
+
+    // Fetch the count
+    $row = $result->fetch_assoc();
+    if ($row) {
+        $count = (int) $row['total_patients'];
+    }
+
+    // Clean up
+    $stmt->close();
+
+    return $count;
+}
+function getDoctorProfile(int $doctor_id, mysqli $conn): array|false
+{
+    $sql = "SELECT
+                d.id AS doctor_id, d.user_id, d.specialty_id, d.license_number,
+                d.qualifications, d.bio, d.consultation_fee, d.available, d.status AS doctor_status,
+                u.name, u.email, u.phone,
+                s.name AS specialty_name
+            FROM doctors d
+            JOIN users u ON d.user_id = u.id
+            LEFT JOIN specialties s ON d.specialty_id = s.id
+            WHERE d.id = ?
+            LIMIT 1";
+
+    $stmt = $conn->prepare($sql);
+    if (!$stmt) {
+        error_log("MySQLi prepare failed in getDoctorProfile: (" . $conn->errno . ") " . $conn->error);
+        return false;
+    }
+    if (!$stmt->bind_param("i", $doctor_id)) {
+        error_log("MySQLi bind_param failed in getDoctorProfile: (" . $stmt->errno . ") " . $stmt->error);
+        $stmt->close();
+        return false;
+    }
+    if (!$stmt->execute()) {
+        error_log("MySQLi execute failed in getDoctorProfile: (" . $stmt->errno . ") " . $stmt->error);
+        $stmt->close();
+        return false;
+    }
+    $result = $stmt->get_result();
+    if (!$result) {
+        error_log("MySQLi get_result failed in getDoctorProfile: (" . $stmt->errno . ") " . $stmt->error);
+        $stmt->close();
+        return false;
+    }
+    $profile = $result->fetch_assoc();
+    $stmt->close();
+    return $profile ?: false;
+}
+
+/**
+ * Fetches all available specialties.
+ *
+ * @param mysqli $conn MySQLi database connection object.
+ * @return array An array of specialties (id, name).
+ */
+function getAllSpecialties(mysqli $conn): array
+{
+    $sql = "SELECT id, name FROM specialties ORDER BY name ASC";
+    $specialties = [];
+    $result = $conn->query($sql); // Simple query, no parameters needed
+    if ($result) {
+        while ($row = $result->fetch_assoc()) {
+            $specialties[] = $row;
+        }
+        $result->free(); // Free result set
+    } else {
+        error_log("MySQLi query failed in getAllSpecialties: (" . $conn->errno . ") " . $conn->error);
+    }
+    return $specialties;
+}
+function updateDoctorProfile(int $doctor_id, int $user_id, array $data, mysqli $conn): bool
+{
+    // Start transaction
+    $conn->begin_transaction();
+
+    try {
+        // --- Update 'users' table ---
+        $sql_user_update = "UPDATE users SET name = ?, email = ?, phone = ?";
+        $params_user = [$data['name'], $data['email'], $data['phone']];
+        $types_user = "sss";
+
+        // Add password update if a new hash is provided
+        if (!empty($data['new_password_hash'])) {
+            $sql_user_update .= ", password = ?";
+            $params_user[] = $data['new_password_hash'];
+            $types_user .= "s";
+        }
+
+        $sql_user_update .= " WHERE id = ?";
+        $params_user[] = $user_id;
+        $types_user .= "i";
+
+        $stmt_user = $conn->prepare($sql_user_update);
+        if (!$stmt_user)
+            throw new Exception("User update prepare failed: " . $conn->error);
+        if (!$stmt_user->bind_param($types_user, ...$params_user))
+            throw new Exception("User update bind failed: " . $stmt_user->error);
+        if (!$stmt_user->execute())
+            throw new Exception("User update execute failed: " . $stmt_user->error);
+        $stmt_user->close();
+
+
+        // --- Update 'doctors' table ---
+        $sql_doctor_update = "UPDATE doctors SET
+                                specialty_id = ?, license_number = ?, qualifications = ?,
+                                bio = ?, consultation_fee = ?, available = ?
+                              WHERE id = ?";
+        $types_doctor = "isssdii"; // Check types: i, s, s, s, d, i, i
+        $params_doctor = [
+            $data['specialty_id'],
+            $data['license_number'],
+            $data['qualifications'],
+            $data['bio'],
+            $data['consultation_fee'],
+            $data['available'],
+            $doctor_id
+        ];
+
+        $stmt_doctor = $conn->prepare($sql_doctor_update);
+        if (!$stmt_doctor)
+            throw new Exception("Doctor update prepare failed: " . $conn->error);
+        if (!$stmt_doctor->bind_param($types_doctor, ...$params_doctor))
+            throw new Exception("Doctor update bind failed: " . $stmt_doctor->error);
+        if (!$stmt_doctor->execute())
+            throw new Exception("Doctor update execute failed: " . $stmt_doctor->error);
+        $stmt_doctor->close();
+
+
+        // If both updates were successful, commit the transaction
+        $conn->commit();
+        return true;
+
+    } catch (Exception $e) {
+        // An error occurred, rollback the transaction
+        $conn->rollback();
+        error_log("Doctor profile update failed: " . $e->getMessage());
+        return false;
+    }
+}
+function getDoctorSchedule(int $doctor_id, mysqli $conn): array
+{
+    // Define the desired order of days
+    $day_order = "'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'";
+
+    $sql = "SELECT id, day_of_week, start_time, end_time, is_available
+            FROM schedules
+            WHERE doctor_id = ?
+            ORDER BY FIELD(day_of_week, {$day_order}), start_time ASC";
+
+    $schedule = [];
+    $stmt = $conn->prepare($sql);
+    if (!$stmt) {
+        error_log("MySQLi prepare failed in getDoctorSchedule: (" . $conn->errno . ") " . $conn->error);
+        return $schedule;
+    }
+    if (!$stmt->bind_param("i", $doctor_id)) {
+        error_log("MySQLi bind_param failed in getDoctorSchedule: (" . $stmt->errno . ") " . $stmt->error);
+        $stmt->close();
+        return $schedule;
+    }
+    if (!$stmt->execute()) {
+        error_log("MySQLi execute failed in getDoctorSchedule: (" . $stmt->errno . ") " . $stmt->error);
+        $stmt->close();
+        return $schedule;
+    }
+    $result = $stmt->get_result();
+    if (!$result) {
+        error_log("MySQLi get_result failed in getDoctorSchedule: (" . $stmt->errno . ") " . $stmt->error);
+        $stmt->close();
+        return $schedule;
+    }
+    while ($row = $result->fetch_assoc()) {
+        // Format times for easier display
+        $row['start_time_formatted'] = date('g:i A', strtotime($row['start_time']));
+        $row['end_time_formatted'] = date('g:i A', strtotime($row['end_time']));
+        $schedule[] = $row;
+    }
+    $stmt->close();
+    return $schedule;
+}
+
+/**
+ * Adds a new schedule entry for a doctor.
+ *
+ * @param int $doctor_id The doctor's ID.
+ * @param string $day The day of the week (e.g., 'monday').
+ * @param string $start_time Start time (HH:MM:SS or HH:MM format).
+ * @param string $end_time End time (HH:MM:SS or HH:MM format).
+ * @param mysqli $conn MySQLi database connection object.
+ * @return bool True on success, False on failure.
+ */
+function addDoctorSchedule(int $doctor_id, string $day, string $start_time, string $end_time, mysqli $conn): bool
+{
+    // Basic validation (more robust validation recommended)
+    $days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+    if (!in_array($day, $days) || strtotime($end_time) <= strtotime($start_time)) {
+        error_log("Invalid data provided to addDoctorSchedule.");
+        return false; // Invalid day or end time not after start time
+    }
+
+    $sql = "INSERT INTO schedules (doctor_id, day_of_week, start_time, end_time, is_available)
+            VALUES (?, ?, ?, ?, 1)"; // Default to available
+
+    $stmt = $conn->prepare($sql);
+    if (!$stmt) {
+        error_log("MySQLi prepare failed in addDoctorSchedule: (" . $conn->errno . ") " . $conn->error);
+        return false;
+    }
+    // Bind parameters: i (doctor_id), s (day), s (start_time), s (end_time)
+    if (!$stmt->bind_param("isss", $doctor_id, $day, $start_time, $end_time)) {
+        error_log("MySQLi bind_param failed in addDoctorSchedule: (" . $stmt->errno . ") " . $stmt->error);
+        $stmt->close();
+        return false;
+    }
+    if (!$stmt->execute()) {
+        error_log("MySQLi execute failed in addDoctorSchedule: (" . $stmt->errno . ") " . $stmt->error);
+        $stmt->close();
+        return false;
+    }
+    $stmt->close();
+    return true;
+}
+
+
+/**
+ * Deletes a specific schedule entry for a doctor.
+ *
+ * @param int $schedule_id The ID of the schedule entry to delete.
+ * @param int $doctor_id The ID of the doctor (for ownership verification).
+ * @param mysqli $conn MySQLi database connection object.
+ * @return bool True on success, False on failure or if not authorized.
+ */
+function deleteDoctorSchedule(int $schedule_id, int $doctor_id, mysqli $conn): bool
+{
+    $sql = "DELETE FROM schedules WHERE id = ? AND doctor_id = ?"; // Verify ownership
+    $stmt = $conn->prepare($sql);
+    if (!$stmt) {
+        error_log("MySQLi prepare failed in deleteDoctorSchedule: (" . $conn->errno . ") " . $conn->error);
+        return false;
+    }
+    if (!$stmt->bind_param("ii", $schedule_id, $doctor_id)) {
+        error_log("MySQLi bind_param failed in deleteDoctorSchedule: (" . $stmt->errno . ") " . $stmt->error);
+        $stmt->close();
+        return false;
+    }
+    if (!$stmt->execute()) {
+        error_log("MySQLi execute failed in deleteDoctorSchedule: (" . $stmt->errno . ") " . $stmt->error);
+        $stmt->close();
+        return false;
+    }
+
+    $deleted = $stmt->affected_rows > 0; // Check if a row was actually deleted
+    $stmt->close();
+    return $deleted;
+}
+
+
+
+
 ?>

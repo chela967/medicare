@@ -26,12 +26,6 @@ if (!isset($_SESSION['user']) || !isset($_SESSION['user']['id'])) {
 // Get the logged-in user's ID
 $user_id = (int) $_SESSION['user']['id'];
 
-// --- TEMPORARY DEBUG LINE ---
-// This will show which user ID the cart page is currently using.
-// Check if this ID matches the user_id (e.g., 7) for the items in your database cart table.
-// REMOVE THIS LINE AFTER DEBUGGING!
-echo "<div class='alert alert-warning' style='position:relative; z-index:9999; margin: 10px;'>Debugging: Cart page is using user_id: " . htmlspecialchars($user_id) . "</div>";
-// --- END DEBUG LINE ---
 
 
 $page_title = "My Cart - Medicare";

@@ -589,6 +589,7 @@ require_once 'footer.php'; // Should contain closing </body> and </html> tags
 </script>
 
 <?php
+require_once 'footer.php';
 // Flush the output buffer and send output to browser
 ob_end_flush();
 ?>
