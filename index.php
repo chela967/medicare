@@ -1,16 +1,10 @@
 <?php
-// index.php - Corrected Structure
+// index.php - Modern UI Redesign
 
-// MUST be first thing in file
 session_start();
-
-// Set page title - This is fine here
 $page_title = "Medicare - Home";
-
-// Include configuration or functions if needed BEFORE any HTML output
-// require_once 'config.php'; // Uncomment if needed here
-// require_once 'functions.php'; // Uncomment if needed here
 ?>
+
 <!DOCTYPE html>
 <html lang="en">
 
@@ -19,164 +13,366 @@ $page_title = "Medicare - Home";
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?php echo isset($page_title) ? htmlspecialchars($page_title) : 'Medicare'; ?></title>
 
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap"
+    <!-- Modern Fonts -->
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@400;500;600&display=swap"
         rel="stylesheet">
-    <link rel="stylesheet" href="css/style.css">
+
+    <!-- Bootstrap 5 -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- Modern CSS Variables -->
     <style>
+        :root {
+            --primary-color: #2563eb;
+            --primary-light: #e0e7ff;
+            --secondary-color: #059669;
+            --dark-color: #1e293b;
+            --light-color: #f8fafc;
+            --text-color: #334155;
+            --text-light: #64748b;
+            --border-radius: 12px;
+            --box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            --transition: all 0.3s ease;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            color: var(--text-color);
+            line-height: 1.6;
+            background-color: #ffffff;
+        }
+
+        h1,
+        h2,
+        h3,
+        h4,
+        h5,
+        h6 {
+            font-family: 'Playfair Display', serif;
+            font-weight: 600;
+            color: var(--dark-color);
+        }
+
+        .btn-primary {
+            background-color: var(--primary-color);
+            border-color: var(--primary-color);
+            padding: 10px 24px;
+            font-weight: 500;
+            border-radius: var(--border-radius);
+            transition: var(--transition);
+        }
+
+        .btn-primary:hover {
+            background-color: #1d4ed8;
+            border-color: #1d4ed8;
+            transform: translateY(-2px);
+            box-shadow: var(--box-shadow);
+        }
+
+        .btn-outline-primary {
+            color: var(--primary-color);
+            border-color: var(--primary-color);
+            padding: 10px 24px;
+            font-weight: 500;
+            border-radius: var(--border-radius);
+            transition: var(--transition);
+        }
+
+        .btn-outline-primary:hover {
+            background-color: var(--primary-color);
+            color: white;
+            transform: translateY(-2px);
+            box-shadow: var(--box-shadow);
+        }
+
+        .section {
+            padding: 80px 0;
+        }
+
+        .section-title {
+            position: relative;
+            margin-bottom: 50px;
+            text-align: center;
+        }
+
+        .section-title:after {
+            content: '';
+            position: absolute;
+            bottom: -15px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 80px;
+            height: 3px;
+            background: var(--primary-color);
+            border-radius: 3px;
+        }
+
+        .card {
+            border: none;
+            border-radius: var(--border-radius);
+            overflow: hidden;
+            transition: var(--transition);
+            box-shadow: var(--box-shadow);
+            height: 100%;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+
+        .service-card {
+            border-top: 3px solid var(--primary-color);
+            padding: 30px 20px;
+            text-align: center;
+        }
+
+        .service-icon {
+            width: 80px;
+            height: 80px;
+            margin: 0 auto 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: var(--primary-light);
+            border-radius: 50%;
+            color: var(--primary-color);
+            font-size: 32px;
+        }
+
+        .doctor-card .card-body {
+            text-align: center;
+            padding: 20px;
+        }
+
+        .doctor-image-wrapper {
+            overflow: hidden;
+            border-radius: var(--border-radius) var(--border-radius) 0 0;
+        }
+
+        .doctor-image {
+            transition: transform 0.5s ease;
+        }
+
+        .doctor-card:hover .doctor-image {
+            transform: scale(1.05);
+        }
+
+        .testimonial-card {
+            border-left: 3px solid var(--primary-color);
+            padding: 30px;
+            background-color: white;
+        }
+
+        .testimonial-card img {
+            width: 80px;
+            height: 80px;
+            object-fit: cover;
+            border: 3px solid var(--primary-light);
+        }
+
+        .carousel-control-prev,
+        .carousel-control-next {
+            width: 40px;
+            height: 40px;
+            background-color: var(--primary-color);
+            border-radius: 50%;
+            top: 50%;
+            transform: translateY(-50%);
+            opacity: 1;
+        }
+
+        .hero {
+            background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+            padding: 100px 0;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hero:before {
+            content: '';
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 40%;
+            height: 100%;
+            background: url('assets/images/medicare.webp') no-repeat center right/contain;
+            opacity: 0.8;
+        }
+
+        .hero-content {
+            position: relative;
+            z-index: 1;
+        }
+
+        .bg-light {
+            background-color: var(--light-color) !important;
+        }
+
+        /* Modern Chatbot Styles */
         .chatbot-icon {
             position: fixed;
-            bottom: 20px;
-            right: 20px;
+            bottom: 30px;
+            right: 30px;
             width: 60px;
             height: 60px;
+            background-color: var(--primary-color);
+            color: white;
+            border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
             cursor: pointer;
             z-index: 1000;
-            transition: transform 0.2s ease-in-out;
+            box-shadow: 0 10px 25px rgba(37, 99, 235, 0.3);
+            transition: all 0.3s ease;
         }
 
         .chatbot-icon:hover {
-            transform: scale(1.1);
+            transform: scale(1.1) rotate(10deg);
+            box-shadow: 0 15px 30px rgba(37, 99, 235, 0.4);
         }
 
         #chatbotWindow {
             position: fixed;
-            bottom: 90px;
-            /* Above the icon */
-            right: 20px;
-            width: 350px;
+            bottom: 100px;
+            right: 30px;
+            width: 380px;
             max-width: 90%;
-            height: 450px;
-            /* Adjust height as needed */
+            height: 500px;
+            background: white;
+            border-radius: var(--border-radius);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
             z-index: 999;
             display: none;
-            /* Initially hidden */
             flex-direction: column;
-            /* Ensure header/body/footer stack */
-            border: none;
-            /* Remove default card border if needed */
-            border-radius: 0.5rem;
-            /* Match Bootstrap's card rounding */
-        }
-
-        #chatbotWindow .card-body {
-            overflow-y: auto;
-            /* Allow scrolling for messages */
-            flex-grow: 1;
-            /* Make message area take available space */
-            padding: 1rem;
-            background-color: #f8f9fa;
-            /* Light background for chat area */
+            overflow: hidden;
+            border: 1px solid #e2e8f0;
         }
 
         #chatbotWindow .card-header {
+            background-color: var(--primary-color);
+            color: white;
             font-weight: 600;
+            padding: 15px 20px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        #chatbotWindow .card-body {
+            flex-grow: 1;
+            padding: 20px;
+            overflow-y: auto;
+            background-color: #f8fafc;
         }
 
         #chatbotWindow .card-footer {
-            padding: 0.75rem 1rem;
+            padding: 15px;
+            background-color: white;
+            border-top: 1px solid #e2e8f0;
         }
 
-        /* Styling for chat messages */
         .user-message,
         .bot-message {
-            margin-bottom: 10px;
-            overflow: hidden;
-            /* contain floats */
+            margin-bottom: 15px;
             display: flex;
-            /* Use flexbox for alignment */
         }
 
         .user-message {
             justify-content: flex-end;
         }
 
-        /* Align user messages right */
         .bot-message {
             justify-content: flex-start;
         }
 
-        /* Align bot messages left */
-
         .user-message>div,
         .bot-message>div {
-            display: inline-block;
             max-width: 80%;
-            word-wrap: break-word;
-            border-radius: 0.75rem;
-            /* Rounded bubbles */
-            padding: 0.5rem 0.8rem;
+            padding: 12px 16px;
+            border-radius: 18px;
             line-height: 1.4;
+            word-wrap: break-word;
         }
 
         .user-message>div {
-            background-color: #0d6efd;
-            /* Bootstrap primary blue */
+            background-color: var(--primary-color);
             color: white;
-            border-bottom-right-radius: 0.2rem;
-            /* Flat corner */
+            border-bottom-right-radius: 4px;
         }
 
         .bot-message>div {
-            background-color: #e9ecef;
-            /* Bootstrap light gray */
-            color: #212529;
-            /* Dark text */
-            border-bottom-left-radius: 0.2rem;
-            /* Flat corner */
+            background-color: white;
+            color: var(--text-color);
+            border-bottom-left-radius: 4px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
         }
 
-        /* Typing indicator style */
-        #typingIndicator .bg-light {
-            color: #6c757d;
-            /* Muted text color */
-            font-style: italic;
+        /* Responsive adjustments */
+        @media (max-width: 992px) {
+            .hero:before {
+                width: 100%;
+                height: 40%;
+                top: auto;
+                bottom: 0;
+                opacity: 0.4;
+            }
+
+            .section {
+                padding: 60px 0;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .hero {
+                padding: 80px 0;
+            }
+
+            .hero:before {
+                display: none;
+            }
+
+            #chatbotWindow {
+                width: 90%;
+                right: 5%;
+            }
         }
     </style>
 </head>
 
 <body>
+    <?php require_once 'header.php'; ?>
 
-    <?php
-    // Include the main header/navbar content AFTER the opening <body> tag
-// Ensure header.php contains the navbar and other top-level elements.
-// It should NOT contain <html>, <head>, or opening <body> tags itself.
-    require_once 'header.php';
-    ?>
-
-    <section class="hero py-5" id="home">
+    <!-- Modern Hero Section -->
+    <section class="hero">
         <div class="container">
             <div class="row align-items-center">
-                <div class="col-lg-6 mb-4 mb-lg-0">
-                    <h1 class="display-4 fw-bold mb-3">We Take Care of Your Health and Medical Needs</h1>
-                    <p class="lead mb-4">A commitment to providing quality healthcare to all individuals seeking our
-                        medical services. Our team of doctors and staff is dedicated to your wellness.</p>
+                <div class="col-lg-7 hero-content">
+                    <h1 class="display-4 fw-bold mb-4">Compassionate Healthcare For Everyone</h1>
+                    <p class="lead mb-4">Our team of dedicated healthcare professionals provides personalized care using
+                        the latest medical technologies to ensure your wellbeing.</p>
                     <div class="d-flex flex-wrap gap-3">
                         <a href="appointment.php" class="btn btn-primary btn-lg px-4">Book Appointment</a>
                         <a href="about.php" class="btn btn-outline-primary btn-lg px-4">Learn More</a>
                     </div>
                 </div>
-                <div class="col-lg-6">
-                    <img src="assets/images/medicare.webp" alt="Medical Healthcare" class="img-fluid rounded shadow">
-                </div>
             </div>
         </div>
     </section>
-    <section class="services py-5 bg-light" id="services">
+
+    <!-- Services Section -->
+    <section class="section bg-light" id="services">
         <div class="container">
-            <div class="text-center mb-5">
-                <h2 class="fw-bold">Our Medical Services</h2>
-                <p class="lead text-muted">We provide a wide range of medical services to meet all your healthcare needs
-                    with professional and experienced staff.</p>
+            <div class="section-title">
+                <h2>Our Medical Services</h2>
+                <p class="text-muted">Comprehensive care for all your health needs</p>
             </div>
 
             <div class="row g-4">
                 <?php
-                // Example services data (consider moving to database or config)
                 $services = [
                     ['icon' => 'fas fa-stethoscope', 'title' => 'Primary Healthcare', 'desc' => 'Comprehensive care for patients of all ages, from routine check-ups to the treatment of acute and chronic illnesses.'],
                     ['icon' => 'fas fa-syringe', 'title' => 'Vaccination', 'desc' => 'Preventive healthcare through immunizations for both children and adults against various diseases.'],
@@ -188,31 +384,33 @@ $page_title = "Medicare - Home";
 
                 foreach ($services as $service) {
                     echo '<div class="col-md-6 col-lg-4">';
-                    echo '<div class="card service-card h-100 p-4 text-center shadow-sm border-0">'; // Added text-center, shadow, border-0
-                    echo '<div class="service-icon text-primary">'; // Changed text-center to text-primary
-                    echo '<i class="' . htmlspecialchars($service['icon']) . ' fa-3x mb-3"></i>';
+                    echo '<div class="service-card card h-100">';
+                    echo '<div class="service-icon">';
+                    echo '<i class="' . htmlspecialchars($service['icon']) . '"></i>';
                     echo '</div>';
                     echo '<div class="card-body">';
                     echo '<h3 class="h4 card-title fw-bold">' . htmlspecialchars($service['title']) . '</h3>';
                     echo '<p class="card-text text-muted">' . htmlspecialchars($service['desc']) . '</p>';
-                    echo '<a href="services.php?service=' . urlencode(strtolower($service['title'])) . '" class="btn btn-outline-primary mt-3 stretched-link">Read More</a>'; // Added stretched-link
+                    echo '<a href="services.php?service=' . urlencode(strtolower($service['title'])) . '" class="btn btn-outline-primary mt-3">Read More</a>';
                     echo '</div></div></div>';
                 }
                 ?>
             </div>
         </div>
     </section>
-    <section class="about py-5" id="about">
+
+    <!-- About Section -->
+    <section class="section" id="about">
         <div class="container">
             <div class="row align-items-center">
                 <div class="col-lg-6 mb-4 mb-lg-0">
                     <img src="assets/images/image1.png" alt="About Medicare" class="img-fluid rounded shadow">
                 </div>
                 <div class="col-lg-6">
-                    <h2 class="fw-bold mb-3">About Medicare Health Center</h2>
-                    <p class="lead text-muted mb-4">Medicare Health Center has been providing exceptional healthcare
-                        services for over 25 years. Our state-of-the-art facilities and compassionate staff ensure that
-                        every patient receives personalized care tailored to their unique needs.</p>
+                    <h2 class="mb-4">About Medicare Health Center</h2>
+                    <p class="lead text-muted mb-4">With over 25 years of experience, Medicare Health Center combines
+                        cutting-edge technology with compassionate care to provide exceptional healthcare services to
+                        our community.</p>
 
                     <div class="row g-3 mb-4">
                         <?php
@@ -220,63 +418,64 @@ $page_title = "Medicare - Home";
                         foreach ($features as $feature) {
                             echo '<div class="col-md-6">';
                             echo '<div class="d-flex align-items-center">';
-                            echo '<div class="bg-primary bg-opacity-10 text-primary rounded-circle p-2 me-3 flex-shrink-0" style="width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center;">'; // Sized icon container
+                            echo '<div class="bg-primary bg-opacity-10 text-primary rounded-circle p-2 me-3" style="width: 36px; height: 36px; display: inline-flex; align-items: center; justify-content: center;">';
                             echo '<i class="fas fa-check"></i>';
                             echo '</div>';
-                            echo '<span>' . htmlspecialchars($feature) . '</span>';
+                            echo '<span class="fw-medium">' . htmlspecialchars($feature) . '</span>';
                             echo '</div></div>';
                         }
                         ?>
                     </div>
 
-                    <a href="about.php" class="btn btn-primary btn-lg px-4">Learn More About Us</a>
+                    <a href="about.php" class="btn btn-primary px-4">Learn More About Us</a>
                 </div>
             </div>
         </div>
     </section>
-    <section class="doctors py-5 bg-light" id="doctors">
+
+    <!-- Doctors Section -->
+    <section class="section bg-light" id="doctors">
         <div class="container">
-            <div class="text-center mb-5">
-                <h2 class="fw-bold">Our Expert Doctors</h2>
-                <p class="lead text-muted">Meet our team of experienced and qualified doctors dedicated to providing the
-                    best healthcare.</p>
+            <div class="section-title">
+                <h2>Our Expert Doctors</h2>
+                <p class="text-muted">Meet our team of board-certified specialists</p>
             </div>
             <div class="row g-4">
                 <?php
-                // Example doctors data (replace with dynamic data from DB if needed)
                 $doctors = [
-                    ['name' => 'Dr. Sarah chelimo', 'specialty' => 'Cardiologist', 'image' => 'download33.jpg'],
+                    ['name' => 'Dr. Sarah Chelimo', 'specialty' => 'Cardiologist', 'image' => 'download33.jpg'],
                     ['name' => 'Dr. Michael Chen', 'specialty' => 'Neurologist', 'image' => 'download23.jpg'],
-                    ['name' => 'Dr. ivan wasswa', 'specialty' => 'Pediatrician', 'image' => 'download44.jpg'],
+                    ['name' => 'Dr. Ivan Wasswa', 'specialty' => 'Pediatrician', 'image' => 'download44.jpg'],
                     ['name' => 'Dr. Robert Williams', 'specialty' => 'Dentist', 'image' => 'download45.jpg']
                 ];
                 foreach ($doctors as $doctor) {
-                    echo '<div class="col-md-6 col-lg-3 d-flex">'; // Added d-flex for equal height cards
-                    echo '<div class="card doctor-card w-100 overflow-hidden border-0 shadow-sm text-center">'; // Added w-100 and text-center
-                    echo '<div class="doctor-image-wrapper ratio ratio-1x1">'; // Use ratio for consistent image aspect
-                    echo '<img src="assets/images/doctors/' . htmlspecialchars($doctor['image']) . '" class="doctor-image img-fluid" alt="' . htmlspecialchars($doctor['name']) . '" style="object-fit: cover;">'; // img-fluid, object-fit
+                    echo '<div class="col-md-6 col-lg-3">';
+                    echo '<div class="doctor-card card">';
+                    echo '<div class="doctor-image-wrapper">';
+                    echo '<img src="assets/images/doctors/' . htmlspecialchars($doctor['image']) . '" class="doctor-image img-fluid" alt="' . htmlspecialchars($doctor['name']) . '">';
                     echo '</div>';
                     echo '<div class="card-body">';
                     echo '<h3 class="h5 card-title fw-bold mb-1">' . htmlspecialchars($doctor['name']) . '</h3>';
-                    echo '<p class="card-text text-primary mb-2">' . htmlspecialchars($doctor['specialty']) . '</p>'; // Specialty in primary color
-                    echo '<div class="d-flex justify-content-center gap-3 mt-2">'; // Social links
-                    echo '<a href="#" class="text-secondary text-decoration-none"><i class="fab fa-facebook-f"></i></a>';
-                    echo '<a href="#" class="text-secondary text-decoration-none"><i class="fab fa-twitter"></i></a>';
-                    echo '<a href="#" class="text-secondary text-decoration-none"><i class="fab fa-linkedin-in"></i></a>';
+                    echo '<p class="card-text text-primary mb-3">' . htmlspecialchars($doctor['specialty']) . '</p>';
+                    echo '<div class="d-flex justify-content-center gap-3">';
+                    echo '<a href="#" class="text-secondary"><i class="fab fa-facebook-f"></i></a>';
+                    echo '<a href="#" class="text-secondary"><i class="fab fa-twitter"></i></a>';
+                    echo '<a href="#" class="text-secondary"><i class="fab fa-linkedin-in"></i></a>';
                     echo '</div>';
                     echo '</div>';
-                    // Removed card-footer for cleaner look
                     echo '</div></div>';
                 }
                 ?>
             </div>
         </div>
     </section>
-    <section class="testimonials py-5" id="testimonials">
+
+    <!-- Testimonials Section -->
+    <section class="section" id="testimonials">
         <div class="container">
-            <div class="text-center mb-5">
-                <h2 class="fw-bold">Patient Testimonials</h2>
-                <p class="lead text-muted">What our patients say about our services</p>
+            <div class="section-title">
+                <h2>Patient Testimonials</h2>
+                <p class="text-muted">What our patients say about our services</p>
             </div>
             <div class="row">
                 <div class="col-12">
@@ -291,86 +490,104 @@ $page_title = "Medicare - Home";
                             foreach ($testimonials as $index => $testimonial) {
                                 $active = $index === 0 ? 'active' : '';
                                 echo '<div class="carousel-item ' . $active . '">';
-                                echo '<div class="card border-0 bg-light p-4 mx-auto shadow-sm" style="max-width: 800px;">'; // Added shadow
-                                echo '<div class="card-body text-center">';
-                                echo '<img src="assets/images/patients/' . htmlspecialchars($testimonial['image']) . '" class="rounded-circle mb-3 shadow-sm" width="80" height="80" alt="' . htmlspecialchars($testimonial['name']) . '" style="object-fit: cover;">'; // Added shadow, object-fit
-                                echo '<p class="lead mb-4 fst-italic">"' . htmlspecialchars($testimonial['text']) . '"</p>'; // Italic text
-                                echo '<h5 class="fw-bold mb-1">' . htmlspecialchars($testimonial['name']) . '</h5>';
-                                echo '<p class="text-muted small">' . htmlspecialchars($testimonial['role']) . '</p>'; // Small text
-                                echo '</div></div></div>';
+                                echo '<div class="testimonial-card mx-auto" style="max-width: 800px;">';
+                                echo '<div class="text-center mb-4">';
+                                echo '<img src="assets/images/patients/' . htmlspecialchars($testimonial['image']) . '" class="rounded-circle shadow-sm" width="80" height="80" alt="' . htmlspecialchars($testimonial['name']) . '">';
+                                echo '</div>';
+                                echo '<p class="lead text-center mb-4 fst-italic">"' . htmlspecialchars($testimonial['text']) . '"</p>';
+                                echo '<h5 class="text-center fw-bold mb-1">' . htmlspecialchars($testimonial['name']) . '</h5>';
+                                echo '<p class="text-center text-muted small">' . htmlspecialchars($testimonial['role']) . '</p>';
+                                echo '</div></div>';
                             }
                             ?>
                         </div>
                         <button class="carousel-control-prev" type="button" data-bs-target="#testimonialCarousel"
                             data-bs-slide="prev">
-                            <span class="carousel-control-prev-icon bg-dark rounded-circle p-3"
-                                aria-hidden="true"></span> <span class="visually-hidden">Previous</span>
+                            <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+                            <span class="visually-hidden">Previous</span>
                         </button>
                         <button class="carousel-control-next" type="button" data-bs-target="#testimonialCarousel"
                             data-bs-slide="next">
-                            <span class="carousel-control-next-icon bg-dark rounded-circle p-3"
-                                aria-hidden="true"></span> <span class="visually-hidden">Next</span>
+                            <span class="carousel-control-next-icon" aria-hidden="true"></span>
+                            <span class="visually-hidden">Next</span>
                         </button>
                     </div>
                 </div>
             </div>
         </div>
     </section>
-    <section class="contact py-5 bg-light" id="contact">
+
+    <!-- Contact Section -->
+    <section class="section bg-light" id="contact">
         <div class="container">
-            <div class="text-center mb-5">
-                <h2 class="fw-bold">Get In Touch</h2>
-                <p class="lead text-muted">Have questions or need to schedule an appointment? Reach out to us.</p>
+            <div class="section-title">
+                <h2>Get In Touch</h2>
+                <p class="text-muted">Have questions or need to schedule an appointment?</p>
             </div>
             <div class="row">
-                <div class="col-lg-6 mb-4 mb-lg-0">
-                    <h3 class="h4 fw-bold mb-4">Contact Information</h3>
-                    <div class="mb-4">
-                        <div class="d-flex align-items-start mb-3">
-                            <div class="bg-primary bg-opacity-10 text-primary rounded-circle p-2 me-3 flex-shrink-0"
-                                style="width: 40px; height: 40px; display: inline-flex; align-items: center; justify-content: center;">
-                                <i class="fas fa-map-marker-alt fa-fw"></i>
+                <div class="col-lg-5 mb-4 mb-lg-0">
+                    <div class="card shadow-sm border-0 h-100">
+                        <div class="card-body p-4">
+                            <h3 class="h4 fw-bold mb-4">Contact Information</h3>
+                            <div class="mb-4">
+                                <div class="d-flex align-items-start mb-3">
+                                    <div class="bg-primary bg-opacity-10 text-primary rounded-circle p-2 me-3"
+                                        style="width: 40px; height: 40px; display: inline-flex; align-items: center; justify-content: center;">
+                                        <i class="fas fa-map-marker-alt fa-fw"></i>
+                                    </div>
+                                    <div>
+                                        <h5 class="fw-bold mb-1 fs-6">Address</h5>
+                                        <p class="mb-0 text-muted">123 Medical Drive, Kabale, HC 12345</p>
+                                    </div>
+                                </div>
+                                <div class="d-flex align-items-start mb-3">
+                                    <div class="bg-primary bg-opacity-10 text-primary rounded-circle p-2 me-3"
+                                        style="width: 40px; height: 40px; display: inline-flex; align-items: center; justify-content: center;">
+                                        <i class="fas fa-phone-alt fa-fw"></i>
+                                    </div>
+                                    <div>
+                                        <h5 class="fw-bold mb-1 fs-6">Phone</h5>
+                                        <p class="mb-0 text-muted">+256 762 165 888</p>
+                                    </div>
+                                </div>
+                                <div class="d-flex align-items-start">
+                                    <div class="bg-primary bg-opacity-10 text-primary rounded-circle p-2 me-3"
+                                        style="width: 40px; height: 40px; display: inline-flex; align-items: center; justify-content: center;">
+                                        <i class="fas fa-envelope fa-fw"></i>
+                                    </div>
+                                    <div>
+                                        <h5 class="fw-bold mb-1 fs-6">Email</h5>
+                                        <p class="mb-0 text-muted">info@medicare.com</p>
+                                    </div>
+                                </div>
                             </div>
-                            <div>
-                                <h5 class="fw-bold mb-1 fs-6">Address</h5>
-                                <p class="mb-0 text-muted">123 Medical Drive, Kabale, HC 12345</p>
-                            </div>
-                        </div>
-                        <div class="d-flex align-items-start mb-3">
-                            <div class="bg-primary bg-opacity-10 text-primary rounded-circle p-2 me-3 flex-shrink-0"
-                                style="width: 40px; height: 40px; display: inline-flex; align-items: center; justify-content: center;">
-                                <i class="fas fa-phone-alt fa-fw"></i>
-                            </div>
-                            <div>
-                                <h5 class="fw-bold mb-1 fs-6">Phone</h5>
-                                <p class="mb-0 text-muted">+256 762 165 888</p>
-                            </div>
-                        </div>
-                        <div class="d-flex align-items-start">
-                            <div class="bg-primary bg-opacity-10 text-primary rounded-circle p-2 me-3 flex-shrink-0"
-                                style="width: 40px; height: 40px; display: inline-flex; align-items: center; justify-content: center;">
-                                <i class="fas fa-envelope fa-fw"></i>
-                            </div>
-                            <div>
-                                <h5 class="fw-bold mb-1 fs-6">Email</h5>
-                                <p class="mb-0 text-muted">info@medicare.com</p>
+                            <div class="mt-4">
+                                <h5 class="fw-bold mb-3">Opening Hours</h5>
+                                <ul class="list-unstyled text-muted">
+                                    <li class="mb-2"><span class="fw-medium">Mon-Fri:</span> 8:00 AM - 8:00 PM</li>
+                                    <li class="mb-2"><span class="fw-medium">Saturday:</span> 9:00 AM - 5:00 PM</li>
+                                    <li><span class="fw-medium">Sunday:</span> Emergency Only</li>
+                                </ul>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <div class="col-lg-6">
-                    <h3 class="h4 fw-bold mb-4">Send Us a Message</h3>
-                    <div class="card shadow-sm border-0">
+                <div class="col-lg-7">
+                    <div class="card shadow-sm border-0 h-100">
                         <div class="card-body p-4">
+                            <h3 class="h4 fw-bold mb-4">Send Us a Message</h3>
                             <form action="contact_handler.php" method="POST">
-                                <div class="mb-3">
-                                    <label for="contactName" class="form-label">Your Name</label>
-                                    <input type="text" class="form-control" id="contactName" name="name" required>
-                                </div>
-                                <div class="mb-3">
-                                    <label for="contactEmail" class="form-label">Email Address</label>
-                                    <input type="email" class="form-control" id="contactEmail" name="email" required>
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label for="contactName" class="form-label">Your Name</label>
+                                        <input type="text" class="form-control" id="contactName" name="name" required>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label for="contactEmail" class="form-label">Email Address</label>
+                                        <input type="email" class="form-control" id="contactEmail" name="email"
+                                            required>
+                                    </div>
                                 </div>
                                 <div class="mb-3">
                                     <label for="contactSubject" class="form-label">Subject</label>
@@ -378,7 +595,7 @@ $page_title = "Medicare - Home";
                                 </div>
                                 <div class="mb-3">
                                     <label for="contactMessage" class="form-label">Message</label>
-                                    <textarea class="form-control" id="contactMessage" name="message" rows="4"
+                                    <textarea class="form-control" id="contactMessage" name="message" rows="5"
                                         required></textarea>
                                 </div>
                                 <button type="submit" class="btn btn-primary">Send Message</button>
@@ -389,68 +606,43 @@ $page_title = "Medicare - Home";
             </div>
         </div>
     </section>
-    <div class="chatbot-icon bg-primary rounded-circle shadow">
-        <i class="fas fa-comment-dots text-white fs-3"></i>
+
+    <!-- Chatbot Elements -->
+    <div class="chatbot-icon">
+        <i class="fas fa-comment-dots"></i>
     </div>
-    <div id="chatbotWindow" class="card shadow">
-        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
-            Medicare Assistant
-            <button type="button" class="btn-close btn-close-white" aria-label="Close" id="closeChatbot"></button>
+
+    <div id="chatbotWindow" class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span>Medicare Assistant</span>
+            <button type="button" class="btn-close" aria-label="Close" id="closeChatbot"></button>
         </div>
-        <div class="card-body flex-grow-1" id="chatbotMessages">
-            <div class="d-flex mb-2 bot-message">
-                <div class="bg-light p-2 rounded text-dark small">
-                    Hello! How can I help you today?
+        <div class="card-body" id="chatbotMessages">
+            <div class="bot-message">
+                <div>
+                    Hello! I'm your Medicare assistant. How can I help you today?
                 </div>
             </div>
         </div>
-        <div class="card-footer bg-light">
+        <div class="card-footer">
             <form id="chatbotForm">
                 <div class="input-group">
                     <input type="text" id="chatbotInput" class="form-control" placeholder="Type your message..."
                         autocomplete="off" required>
                     <button class="btn btn-primary" type="submit" id="chatbotSendBtn">
-                        <i class="fas fa-paper-plane"></i> Send
+                        <i class="fas fa-paper-plane"></i>
                     </button>
                 </div>
             </form>
         </div>
     </div>
-    <?php
-    // Include the footer content BEFORE the closing </body> tag
-// Ensure footer.php contains the main <footer> element and potentially the closing </body>/</html> tags
-    require_once 'footer.php';
-    ?>
+
+    <?php require_once 'footer.php'; ?>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
-    <?php
-    // Define the path relative to the document root
-    $jsFilePath = $_SERVER['DOCUMENT_ROOT'] . '/medicare/js/script.js'; // Assumes medicare is the root folder in htdocs
-    $jsSrcPath = '/medicare/js/script.js'; // Path for the src attribute
-    
-    // Check if the file exists in the expected location
-    if (file_exists($jsFilePath)) {
-        echo '<script src="' . $jsSrcPath . '"></script>';
-    } else {
-        // Log if file is missing - check your XAMPP PHP error log
-        // error_log("Notice: Custom script file not found at: " . $jsFilePath);
-        // Create the directory if it doesn't exist (optional, requires write permissions)
-        // $jsDir = dirname($jsFilePath);
-        // if (!is_dir($jsDir)) {
-        //     mkdir($jsDir, 0755, true);
-        // }
-        // Create an empty file if it doesn't exist (optional, requires write permissions)
-        // if (!file_exists($jsFilePath)) {
-        //    file_put_contents($jsFilePath, '');
-        //    echo '<script src="' . $jsSrcPath . '"></script>'; // Include it now
-        // }
-    }
-    ?>
-
-
     <script>
-        // Wrap all JS in DOMContentLoaded to ensure HTML is ready
+        // Chatbot functionality remains exactly the same
         document.addEventListener('DOMContentLoaded', (event) => {
             const chatbotIcon = document.querySelector('.chatbot-icon');
             const chatbotWindow = document.getElementById('chatbotWindow');
@@ -458,18 +650,15 @@ $page_title = "Medicare - Home";
             const chatbotMessages = document.getElementById('chatbotMessages');
             const chatbotForm = document.getElementById('chatbotForm');
             const chatbotInput = document.getElementById('chatbotInput');
-            const chatbotSendBtn = document.getElementById('chatbotSendBtn'); // Get send button
+            const chatbotSendBtn = document.getElementById('chatbotSendBtn');
 
-            // Check if all chatbot elements were found
             if (chatbotIcon && chatbotWindow && closeChatbotBtn && chatbotMessages && chatbotForm && chatbotInput && chatbotSendBtn) {
-
-                // --- Toggle Chat Window ---
                 chatbotIcon.addEventListener('click', () => {
                     const isHidden = chatbotWindow.style.display === 'none' || chatbotWindow.style.display === '';
                     chatbotWindow.style.display = isHidden ? 'flex' : 'none';
                     if (isHidden) {
                         scrollToBottom();
-                        chatbotInput.focus(); // Focus input when opened
+                        chatbotInput.focus();
                     }
                 });
 
@@ -477,16 +666,7 @@ $page_title = "Medicare - Home";
                     chatbotWindow.style.display = 'none';
                 });
 
-                // --- Handle Sending Messages ---
                 chatbotForm.addEventListener('submit', handleSendMessage);
-                // Optional: Allow sending with Enter key
-                // chatbotInput.addEventListener('keypress', function (e) {
-                //    if (e.key === 'Enter' && !e.shiftKey) { // Send on Enter, allow Shift+Enter for newline
-                //        e.preventDefault();
-                //        handleSendMessage(e);
-                //    }
-                // });
-
 
                 async function handleSendMessage(submitEvent) {
                     submitEvent.preventDefault();
@@ -495,22 +675,21 @@ $page_title = "Medicare - Home";
 
                     addMessage(userMessage, 'user');
                     chatbotInput.value = '';
-                    chatbotInput.disabled = true; // Disable input
-                    chatbotSendBtn.disabled = true; // Disable button
-                    chatbotSendBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>'; // Loading spinner
+                    chatbotInput.disabled = true;
+                    chatbotSendBtn.disabled = true;
+                    chatbotSendBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>';
 
-                    const apiUrl = 'http://127.0.0.1:5000/chat'; // Flask API endpoint
+                    const apiUrl = 'http://127.0.0.1:5000/chat';
                     let thinkingIndicatorAdded = false;
                     let typingTimeout = null;
 
                     try {
-                        // Add thinking indicator slightly delayed
                         typingTimeout = setTimeout(() => {
-                            if (chatbotInput.disabled) { // Only add if still waiting
+                            if (chatbotInput.disabled) {
                                 addMessage("...", 'bot', true);
                                 thinkingIndicatorAdded = true;
                             }
-                        }, 400); // 400ms delay
+                        }, 400);
 
                         const response = await fetch(apiUrl, {
                             method: 'POST',
@@ -518,7 +697,7 @@ $page_title = "Medicare - Home";
                             body: JSON.stringify({ message: userMessage })
                         });
 
-                        clearTimeout(typingTimeout); // Clear timeout if response is fast
+                        clearTimeout(typingTimeout);
                         if (thinkingIndicatorAdded) removeTypingIndicator();
 
                         const contentType = response.headers.get("content-type");
@@ -538,15 +717,13 @@ $page_title = "Medicare - Home";
                         console.error('Chatbot API Fetch Error:', error);
                         addMessage(`Error: ${error.message}`, 'bot');
                     } finally {
-                        chatbotInput.disabled = false; // Re-enable input
-                        chatbotSendBtn.disabled = false; // Re-enable button
-                        chatbotSendBtn.innerHTML = '<i class="fas fa-paper-plane"></i> Send'; // Restore button text
+                        chatbotInput.disabled = false;
+                        chatbotSendBtn.disabled = false;
+                        chatbotSendBtn.innerHTML = '<i class="fas fa-paper-plane"></i>';
                         chatbotInput.focus();
                     }
-                } // end handleSendMessage
+                }
 
-
-                // --- Helper Function to Add Messages ---
                 function addMessage(message, sender, isTyping = false) {
                     if (!chatbotMessages) return;
                     const messageWrapper = document.createElement('div');
@@ -554,41 +731,29 @@ $page_title = "Medicare - Home";
                     if (isTyping) messageWrapper.id = 'typingIndicator';
 
                     const messageBubble = document.createElement('div');
-                    messageBubble.classList.add(sender === 'user' ? 'bg-primary' : 'bg-light');
-                    messageBubble.classList.add('p-2', 'rounded', 'text-dark', 'small');
+                    messageBubble.classList.add(sender === 'user' ? 'bg-primary' : 'bg-white');
                     if (sender === 'user') messageBubble.classList.add('text-white');
 
-                    // Basic check for safety - consider a more robust sanitizer if needed
                     const tempDiv = document.createElement('div');
                     tempDiv.textContent = message;
-                    messageBubble.innerHTML = tempDiv.innerHTML; // Use innerHTML AFTER setting textContent for basic escaping
+                    messageBubble.innerHTML = tempDiv.innerHTML;
 
                     messageWrapper.appendChild(messageBubble);
                     chatbotMessages.appendChild(messageWrapper);
                     scrollToBottom();
                 }
 
-                // --- Helper to remove typing indicator ---
                 function removeTypingIndicator() {
                     const typingIndicator = document.getElementById('typingIndicator');
                     if (typingIndicator) typingIndicator.remove();
                 }
 
-                // --- Helper Function to Scroll to Bottom ---
                 function scrollToBottom() {
                     if (chatbotMessages) chatbotMessages.scrollTop = chatbotMessages.scrollHeight;
                 }
-
-            } else {
-                console.error("Chatbot UI elements not found! Check HTML IDs: chatbotIcon, chatbotWindow, closeChatbot, chatbotMessages, chatbotForm, chatbotInput, chatbotSendBtn");
             }
-
-        }); // End DOMContentLoaded listener
+        });
     </script>
+</body>
 
-    <?php
-    // Ensure footer.php OR this file includes closing </body> and </html> tags.
-    require_once 'footer.php';
-    // </body>
-    // </html>
-    ?>
+</html>

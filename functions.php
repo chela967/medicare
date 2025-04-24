@@ -1354,7 +1354,19 @@ function deleteDoctorSchedule(int $schedule_id, int $doctor_id, mysqli $conn): b
     $stmt->close();
     return $deleted;
 }
-
+function calculateAge($dob)
+{
+    if (empty($dob) || $dob === '0000-00-00') {
+        return 'N/A';
+    }
+    try {
+        $birthDate = new DateTime($dob);
+        $today = new DateTime('today');
+        return $today->diff($birthDate)->y;
+    } catch (Exception $e) {
+        return 'N/A';
+    }
+}
 
 
 
