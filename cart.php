@@ -1,152 +1,124 @@
 <?php
-// cart.php
-
-// Start session BEFORE any output
 session_start();
+require_once 'config.php';
+require_once 'functions.php';
 
-// Include configuration and functions
-// Ensure these files exist and contain the necessary definitions
-require_once 'config.php'; // Should define $conn (MySQLi connection)
-require_once 'functions.php'; // Should define getCart(), updateCartItem(), removeCartItem(), processCheckout(), calculateSubtotal(), getPaymentMethods()
-
-// --- Security & Initialization ---
-
-// Set security headers (optional but recommended)
+// Security headers
 header("X-Frame-Options: DENY");
 header("X-Content-Type-Options: nosniff");
-header("Referrer-Policy: strict-origin-when-cross-origin");
 
 // Redirect if not logged in
-if (!isset($_SESSION['user']) || !isset($_SESSION['user']['id'])) {
-    // Redirect to login page, passing the current page as a redirect target
-    header("Location: auth.php?redirect=cart");
+if (!isset($_SESSION['user'])) {
+    header("Location: login.php");
     exit();
 }
 
-// Get the logged-in user's ID
 $user_id = (int) $_SESSION['user']['id'];
-
-
-
 $page_title = "My Cart - Medicare";
 $error_message = '';
 $success_message = '';
 
-// --- Process Cart Actions (Update Quantity, Remove Item, Checkout) ---
+// Process cart actions
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-
-    // CSRF Token Validation (Assuming you have one in your form/session)
-    // if (empty($_POST['csrf_token']) || !hash_equals($_SESSION['csrf_token'] ?? '', $_POST['csrf_token'])) {
-    //     $error_message = "Invalid request (CSRF token mismatch).";
-    // } else {
-
     if (isset($_POST['update_cart'])) {
-        // Handle cart updates
         if (isset($_POST['quantity']) && is_array($_POST['quantity'])) {
-            $updated_count = 0;
             foreach ($_POST['quantity'] as $cart_id => $quantity) {
-                // Basic validation for quantity
-                $cart_id_int = (int) $cart_id;
-                $quantity_int = (int) $quantity;
-                if ($cart_id_int > 0 && $quantity_int > 0) {
-                    // Ideally, updateCartItem should return true/false or throw an Exception
-                    // And also check against stock levels before updating!
-                    if (function_exists('updateCartItem')) {
-                        updateCartItem($cart_id_int, $user_id, $quantity_int); // Assuming this function handles DB interaction
-                        $updated_count++;
-                    } else {
-                        $error_message = "Error: Required function 'updateCartItem' is missing.";
-                        break; // Stop processing if function missing
-                    }
+                $cart_id = (int) $cart_id;
+                $quantity = (int) $quantity;
+                if ($cart_id > 0 && $quantity > 0) {
+                    $conn->query("UPDATE cart SET quantity = $quantity WHERE id = $cart_id AND user_id = $user_id");
                 }
             }
-            if ($updated_count > 0 && empty($error_message)) {
-                $success_message = "Cart updated successfully.";
-                // It's often better to redirect after POST to prevent re-submission
-                // header("Location: cart.php?status=updated");
-                // exit();
-            } elseif (empty($error_message)) {
-                $error_message = "No valid quantities provided for update.";
-            }
-        } else {
-            $error_message = "Invalid update request.";
+            $success_message = "Cart updated successfully.";
         }
-
-    } elseif (isset($_POST['remove_item']) && isset($_POST['cart_id'])) {
-        // Handle item removal
-        $cart_id_to_remove = (int) $_POST['cart_id'];
-        if ($cart_id_to_remove > 0) {
-            if (function_exists('removeCartItem')) {
-                removeCartItem($cart_id_to_remove, $user_id); // Assuming this function handles DB interaction
-                $success_message = "Item removed successfully.";
-                // It's often better to redirect after POST
-                // header("Location: cart.php?status=removed");
-                // exit();
-            } else {
-                $error_message = "Error: Required function 'removeCartItem' is missing.";
-            }
-        } else {
-            $error_message = "Invalid item ID for removal.";
+    } elseif (isset($_POST['remove_item'])) {
+        $cart_id = (int) $_POST['cart_id'];
+        if ($cart_id > 0) {
+            $conn->query("DELETE FROM cart WHERE id = $cart_id AND user_id = $user_id");
+            $success_message = "Item removed successfully.";
         }
-
     } elseif (isset($_POST['checkout'])) {
-        // Process checkout
-        $payment_method_id = isset($_POST['payment_method']) ? (int) $_POST['payment_method'] : 0;
+        try {
+            $conn->begin_transaction();
 
-        if ($payment_method_id <= 0) {
-            $error_message = "Please select a valid payment method.";
-        } else {
-            if (function_exists('processCheckout')) {
-                // processCheckout should handle order creation, clearing cart, etc.
-                // It should return the order_id on success, or false/null on failure.
-                $order_id = processCheckout($user_id, $payment_method_id);
-                if ($order_id) {
-                    // Redirect to a confirmation page
-                    header("Location: order_confirmation.php?id=" . $order_id);
-                    exit();
-                } else {
-                    // processCheckout should ideally set a more specific error message via a session flash or return value
-                    $error_message = "Checkout failed. Please try again or contact support.";
-                }
-            } else {
-                $error_message = "Error: Required function 'processCheckout' is missing.";
+            // Calculate total
+            $cart_items = $conn->query("
+                SELECT c.id, c.medicine_id, c.quantity, m.price, m.stock, m.name
+                FROM cart c
+                JOIN medicines m ON c.medicine_id = m.id
+                WHERE c.user_id = $user_id
+            ")->fetch_all(MYSQLI_ASSOC);
+
+            if (empty($cart_items)) {
+                throw new Exception("Your cart is empty");
             }
+
+            $subtotal = 0;
+            foreach ($cart_items as $item) {
+                $subtotal += $item['price'] * $item['quantity'];
+            }
+            $total = $subtotal + 5.00; // Delivery fee
+
+            // Create order
+            $conn->query("
+                INSERT INTO orders (user_id, total_amount, status) 
+                VALUES ($user_id, $total, 'pending')
+            ");
+            $order_id = $conn->insert_id;
+
+            // Add order items and update stock
+            foreach ($cart_items as $item) {
+                if ($item['quantity'] > $item['stock']) {
+                    throw new Exception("Not enough stock for {$item['name']}");
+                }
+
+                $conn->query("
+                    INSERT INTO order_items (order_id, medicine_id, quantity, price)
+                    VALUES ($order_id, {$item['medicine_id']}, {$item['quantity']}, {$item['price']})
+                ");
+
+                $conn->query("
+                    UPDATE medicines 
+                    SET stock = stock - {$item['quantity']} 
+                    WHERE id = {$item['medicine_id']}
+                ");
+            }
+
+            // Clear cart
+            $conn->query("DELETE FROM cart WHERE user_id = $user_id");
+
+            $conn->commit();
+
+            header("Location: process_payment.php?type=pharmacy&id=$order_id");
+            exit();
+
+        } catch (Exception $e) {
+            $conn->rollback();
+            $error_message = "Checkout failed: " . $e->getMessage();
         }
     }
-    // } // End CSRF check brace
 }
 
-// --- Get Cart Data (After potential updates/removals) ---
-// Ensure the getCart function exists before calling
-if (function_exists('getCart')) {
-    $cart_items = getCart($user_id);
-} else {
-    $cart_items = []; // Default to empty if function missing
-    $error_message = "Error: Required function 'getCart' is missing. Cannot display cart items.";
+// Get cart data
+$cart_items = $conn->query("
+    SELECT c.id, c.medicine_id, c.quantity, m.name, m.price, m.image 
+    FROM cart c
+    JOIN medicines m ON c.medicine_id = m.id
+    WHERE c.user_id = $user_id
+")->fetch_all(MYSQLI_ASSOC);
+
+$subtotal = 0;
+foreach ($cart_items as $item) {
+    $subtotal += $item['price'] * $item['quantity'];
 }
-
-
-// Calculate totals (Ensure function exists)
-if (function_exists('calculateSubtotal')) {
-    $subtotal = calculateSubtotal($cart_items); // Assuming this function calculates sum based on items
-} else {
-    $subtotal = 0; // Default if function missing
-    if (!empty($cart_items)) { // Show error only if cart items were expected
-        $error_message .= " Error: Required function 'calculateSubtotal' is missing.";
-    }
-}
-
-$delivery_fee = 5.00; // Example fixed delivery fee
+$delivery_fee = 5.00;
 $total = $subtotal + $delivery_fee;
 
-// --- Include Header ---
-// Make sure header.php doesn't start session again or output before this point
 include 'header.php';
 ?>
 
 <main class="cart-page py-5 bg-light">
     <div class="container">
-
         <?php if ($error_message): ?>
             <div class="alert alert-danger"><?= htmlspecialchars($error_message) ?></div>
         <?php endif; ?>
@@ -192,22 +164,21 @@ include 'header.php';
                                                             </div>
                                                         </div>
                                                     </td>
-                                                    <td class="text-end">$<?= number_format($item['price'] ?? 0, 2) ?></td>
+                                                    <td class="text-end">UGX <?= number_format($item['price'] ?? 0, 2) ?></td>
                                                     <td class="text-center">
-                                                        <input type="number" name="quantity[<?= (int) $item['id'] ?>]"
-                                                            value="<?= (int) $item['quantity'] ?>" min="1" max="10"
+                                                        <input type="number" name="quantity[<?= $item['id'] ?>]"
+                                                            value="<?= $item['quantity'] ?>" min="1" max="10"
                                                             class="form-control form-control-sm mx-auto" style="width: 70px;">
                                                     </td>
                                                     <td class="text-end">
-                                                        $<?= number_format(((float) ($item['price'] ?? 0)) * ((int) $item['quantity']), 2) ?>
+                                                        UGX <?= number_format($item['price'] * $item['quantity'], 2) ?>
                                                     </td>
                                                     <td class="text-center">
                                                         <form method="POST" action="cart.php" style="display: inline;">
-                                                            <input type="hidden" name="cart_id"
-                                                                value="<?= (int) $item['id'] ?>">
+                                                            <input type="hidden" name="cart_id" value="<?= $item['id'] ?>">
                                                             <button type="submit" name="remove_item"
-                                                                class="btn btn-sm btn-outline-danger" title="Remove Item"
-                                                                onclick="return confirm('Are you sure you want to remove this item?')">
+                                                                class="btn btn-sm btn-outline-danger"
+                                                                onclick="return confirm('Remove this item?')">
                                                                 <i class="fas fa-trash"></i>
                                                             </button>
                                                         </form>
@@ -220,10 +191,10 @@ include 'header.php';
 
                                 <div class="d-flex justify-content-between align-items-center">
                                     <a href="epharmacy.php" class="btn btn-outline-primary">
-                                        <i class="fas fa-chevron-left me-1"></i>Continue Shopping
+                                        <i class="fas fa-chevron-left me-2"></i> Continue Shopping
                                     </a>
                                     <button type="submit" name="update_cart" class="btn btn-secondary">
-                                        <i class="fas fa-sync-alt me-1"></i>Update Quantities
+                                        <i class="fas fa-sync-alt me-2"></i> Update Cart
                                     </button>
                                 </div>
                             </form>
@@ -239,61 +210,23 @@ include 'header.php';
 
                         <div class="d-flex justify-content-between mb-2">
                             <span>Subtotal:</span>
-                            <span>$<?= number_format($subtotal, 2) ?></span>
+                            <span>UGX <?= number_format($subtotal, 2) ?></span>
                         </div>
                         <div class="d-flex justify-content-between mb-2">
                             <span>Delivery Fee:</span>
-                            <span>$<?= number_format($delivery_fee, 2) ?></span>
+                            <span>UGX <?= number_format($delivery_fee, 2) ?></span>
                         </div>
                         <hr>
                         <div class="d-flex justify-content-between fw-bold h5 mb-4">
                             <span>Total:</span>
-                            <span>$<?= number_format($total, 2) ?></span>
+                            <span>UGX <?= number_format($total, 2) ?></span>
                         </div>
 
                         <?php if (!empty($cart_items)): ?>
                             <form method="POST" action="cart.php">
-                                <h5 class="mb-3">Payment Method</h5>
-
-                                <?php
-                                // Get payment methods (Ensure function exists)
-                                if (function_exists('getPaymentMethods')) {
-                                    $payment_methods = getPaymentMethods(); // Assuming this returns an array of methods
-                                } else {
-                                    $payment_methods = [];
-                                    echo "<p class='text-danger'>Error: Could not load payment methods.</p>";
-                                }
-
-                                if (!empty($payment_methods)) {
-                                    foreach ($payment_methods as $index => $method):
-                                        // Basic check for expected keys
-                                        $method_id = $method['id'] ?? null;
-                                        $method_name = $method['name'] ?? 'Unnamed Method';
-                                        $method_icon = $method['icon'] ?? 'fas fa-question-circle';
-                                        if ($method_id === null)
-                                            continue; // Skip if ID is missing
-                                        ?>
-                                        <div class="form-check mb-2">
-                                            <input class="form-check-input" type="radio" name="payment_method"
-                                                id="method<?= (int) $method_id ?>" value="<?= (int) $method_id ?>" required
-                                                <?= ($index === 0) ? 'checked' : '' ?>> <label class="form-check-label"
-                                                for="method<?= (int) $method_id ?>">
-                                                <i class="<?= htmlspecialchars($method_icon) ?> me-2"></i>
-                                                <?= htmlspecialchars($method_name) ?>
-                                            </label>
-                                        </div>
-                                        <?php
-                                    endforeach;
-                                } else if (function_exists('getPaymentMethods')) {
-                                    echo "<p class='text-muted'>No payment methods available.</p>";
-                                }
-                                ?>
-
-                                <?php if (!empty($payment_methods)): // Only show button if methods exist ?>
-                                    <button type="submit" name="checkout" class="btn btn-success w-100 mt-3 py-2">
-                                        <i class="fas fa-lock me-2"></i>Proceed to Checkout
-                                    </button>
-                                <?php endif; ?>
+                                <button type="submit" name="checkout" class="btn btn-success w-100 mt-3 py-2">
+                                    <i class="fas fa-lock me-2"></i> Proceed to Checkout
+                                </button>
                             </form>
                         <?php endif; ?>
                     </div>
@@ -303,7 +236,4 @@ include 'header.php';
     </div>
 </main>
 
-<?php
-// --- Include Footer ---
-include 'footer.php';
-?>
+<?php include 'footer.php'; ?>

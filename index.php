@@ -269,6 +269,24 @@ $page_title = "Medicare - Home";
             background-color: #f8fafc;
         }
 
+        .chat-link-btn {
+            display: inline-block;
+            margin-top: 8px;
+            padding: 6px 12px;
+            background-color: var(--primary-color);
+            color: white;
+            border-radius: var(--border-radius);
+            text-decoration: none;
+            font-size: 0.9rem;
+            transition: var(--transition);
+        }
+
+        .chat-link-btn:hover {
+            background-color: #1d4ed8;
+            transform: translateY(-2px);
+            box-shadow: var(--box-shadow);
+        }
+
         #chatbotWindow .card-footer {
             padding: 15px;
             background-color: white;
@@ -637,12 +655,12 @@ $page_title = "Medicare - Home";
         </div>
     </div>
 
+
     <?php require_once 'footer.php'; ?>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
     <script>
-        // Chatbot functionality remains exactly the same
         document.addEventListener('DOMContentLoaded', (event) => {
             const chatbotIcon = document.querySelector('.chatbot-icon');
             const chatbotWindow = document.getElementById('chatbotWindow');
@@ -652,106 +670,105 @@ $page_title = "Medicare - Home";
             const chatbotInput = document.getElementById('chatbotInput');
             const chatbotSendBtn = document.getElementById('chatbotSendBtn');
 
-            if (chatbotIcon && chatbotWindow && closeChatbotBtn && chatbotMessages && chatbotForm && chatbotInput && chatbotSendBtn) {
-                chatbotIcon.addEventListener('click', () => {
-                    const isHidden = chatbotWindow.style.display === 'none' || chatbotWindow.style.display === '';
-                    chatbotWindow.style.display = isHidden ? 'flex' : 'none';
-                    if (isHidden) {
-                        scrollToBottom();
-                        chatbotInput.focus();
-                    }
-                });
-
-                closeChatbotBtn.addEventListener('click', () => {
-                    chatbotWindow.style.display = 'none';
-                });
-
-                chatbotForm.addEventListener('submit', handleSendMessage);
-
-                async function handleSendMessage(submitEvent) {
-                    submitEvent.preventDefault();
-                    const userMessage = chatbotInput.value.trim();
-                    if (!userMessage) return;
-
-                    addMessage(userMessage, 'user');
-                    chatbotInput.value = '';
-                    chatbotInput.disabled = true;
-                    chatbotSendBtn.disabled = true;
-                    chatbotSendBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>';
-
-                    const apiUrl = 'http://127.0.0.1:5000/chat';
-                    let thinkingIndicatorAdded = false;
-                    let typingTimeout = null;
-
-                    try {
-                        typingTimeout = setTimeout(() => {
-                            if (chatbotInput.disabled) {
-                                addMessage("...", 'bot', true);
-                                thinkingIndicatorAdded = true;
-                            }
-                        }, 400);
-
-                        const response = await fetch(apiUrl, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-                            body: JSON.stringify({ message: userMessage })
-                        });
-
-                        clearTimeout(typingTimeout);
-                        if (thinkingIndicatorAdded) removeTypingIndicator();
-
-                        const contentType = response.headers.get("content-type");
-                        if (!response.ok || !contentType || !contentType.includes("application/json")) {
-                            let errorText = `API Error ${response.status}. Expected JSON.`;
-                            try { const text = await response.text(); console.error("API Error Response:", text); errorText = `Server error ${response.status}. Check logs.`; } catch (e) { }
-                            throw new Error(errorText);
-                        }
-
-                        const data = await response.json();
-                        const botReply = data.reply || "Sorry, I couldn't process that response.";
-                        addMessage(botReply, 'bot');
-
-                    } catch (error) {
-                        clearTimeout(typingTimeout);
-                        if (thinkingIndicatorAdded) removeTypingIndicator();
-                        console.error('Chatbot API Fetch Error:', error);
-                        addMessage(`Error: ${error.message}`, 'bot');
-                    } finally {
-                        chatbotInput.disabled = false;
-                        chatbotSendBtn.disabled = false;
-                        chatbotSendBtn.innerHTML = '<i class="fas fa-paper-plane"></i>';
-                        chatbotInput.focus();
-                    }
-                }
-
-                function addMessage(message, sender, isTyping = false) {
-                    if (!chatbotMessages) return;
-                    const messageWrapper = document.createElement('div');
-                    messageWrapper.classList.add(sender === 'user' ? 'user-message' : 'bot-message');
-                    if (isTyping) messageWrapper.id = 'typingIndicator';
-
-                    const messageBubble = document.createElement('div');
-                    messageBubble.classList.add(sender === 'user' ? 'bg-primary' : 'bg-white');
-                    if (sender === 'user') messageBubble.classList.add('text-white');
-
-                    const tempDiv = document.createElement('div');
-                    tempDiv.textContent = message;
-                    messageBubble.innerHTML = tempDiv.innerHTML;
-
-                    messageWrapper.appendChild(messageBubble);
-                    chatbotMessages.appendChild(messageWrapper);
+            // Toggle chatbot window
+            chatbotIcon.addEventListener('click', () => {
+                chatbotWindow.style.display = chatbotWindow.style.display === 'flex' ? 'none' : 'flex';
+                if (chatbotWindow.style.display === 'flex') {
                     scrollToBottom();
+                    chatbotInput.focus();
                 }
+            });
 
-                function removeTypingIndicator() {
-                    const typingIndicator = document.getElementById('typingIndicator');
-                    if (typingIndicator) typingIndicator.remove();
-                }
+            // Close button
+            closeChatbotBtn.addEventListener('click', () => {
+                chatbotWindow.style.display = 'none';
+            });
 
-                function scrollToBottom() {
-                    if (chatbotMessages) chatbotMessages.scrollTop = chatbotMessages.scrollHeight;
+            // Handle form submission
+            chatbotForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const userMessage = chatbotInput.value.trim();
+                if (!userMessage) return;
+
+                // Add user message to chat
+                addMessage(userMessage, 'user');
+                chatbotInput.value = '';
+
+                // Disable input while processing
+                chatbotInput.disabled = true;
+                chatbotSendBtn.disabled = true;
+                chatbotSendBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>';
+
+                try {
+                    // Show typing indicator
+                    const typingIndicator = addMessage("...", 'bot', true);
+
+                    // Call Flask API (running on port 5000)
+                    const response = await fetch('http://localhost:5000/chat', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ message: userMessage })
+                    });
+
+                    // Remove typing indicator
+                    if (typingIndicator) {
+                        typingIndicator.remove();
+                    }
+
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+
+                    const data = await response.json();
+
+                    // Handle different response types
+                    if (data.type === 'link') {
+                        const linkMessage = `${data.message} <a href="${data.url}" class="chat-link-btn" target="_blank">${data.text}</a>`;
+                        addMessage(linkMessage, 'bot');
+                    } else {
+                        addMessage(data.content, 'bot');
+                    }
+                } catch (error) {
+                    console.error('Error:', error);
+                    addMessage("Sorry, I'm having trouble connecting to the server. Please try again later.", 'bot');
+                } finally {
+                    // Re-enable input
+                    chatbotInput.disabled = false;
+                    chatbotSendBtn.disabled = false;
+                    chatbotSendBtn.innerHTML = '<i class="fas fa-paper-plane"></i>';
+                    chatbotInput.focus();
                 }
+            });
+
+            function addMessage(content, sender, isTyping = false) {
+                const messageDiv = document.createElement('div');
+                messageDiv.className = sender === 'user' ? 'user-message' : 'bot-message';
+                if (isTyping) messageDiv.id = 'typingIndicator';
+
+                const contentDiv = document.createElement('div');
+                contentDiv.innerHTML = content;
+                messageDiv.appendChild(contentDiv);
+
+                chatbotMessages.appendChild(messageDiv);
+                scrollToBottom();
+
+                return isTyping ? messageDiv : null;
             }
+
+            function scrollToBottom() {
+                chatbotMessages.scrollTop = chatbotMessages.scrollHeight;
+            }
+
+            // Optional: Auto-open chatbot after 30 seconds
+            setTimeout(() => {
+                if (!sessionStorage.getItem('chatbotShown')) {
+                    chatbotWindow.style.display = 'flex';
+                    scrollToBottom();
+                    sessionStorage.setItem('chatbotShown', 'true');
+                }
+            }, 30000);
         });
     </script>
 </body>

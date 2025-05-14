@@ -31,6 +31,19 @@ try {
         }
     }
 
+    // First, check for any scheduled appointments that have passed and mark them as no_show
+    $update_sql = "UPDATE appointments 
+                   SET status = 'no_show', 
+                       notes = CONCAT(IFNULL(notes, ''), '\nAutomatically marked as no show - patient did not attend')
+                   WHERE patient_id = ? 
+                   AND status = 'scheduled'
+                   AND CONCAT(appointment_date, ' ', appointment_time) < NOW()";
+
+    $stmt = $mysqli->prepare($update_sql);
+    $stmt->bind_param("i", $patient_id);
+    $stmt->execute();
+    $stmt->close();
+
     // Base SQL with status filter
     $status_condition = $status === 'all' ? "" : "AND a.status = ?";
 
@@ -55,7 +68,12 @@ try {
     // Fetch paginated
     $sql = "SELECT a.id, a.appointment_date, a.appointment_time, a.status,
                    a.consultation_fee, a.consultation_notes, a.meeting_link,
-                   d.name as doctor_name, s.name as specialty
+                   d.name as doctor_name, s.name as specialty,
+                   CASE 
+                       WHEN a.status = 'scheduled' AND CONCAT(a.appointment_date, ' ', a.appointment_time) < NOW() 
+                       THEN 'no_show'
+                       ELSE a.status
+                   END as display_status
             FROM appointments a
             JOIN doctors doc ON a.doctor_id = doc.id
             JOIN users d ON doc.user_id = d.id
@@ -107,6 +125,7 @@ try {
                                 </option>
                                 <option value="cancelled" <?= $status === 'cancelled' ? 'selected' : '' ?>>Cancelled
                                 </option>
+                                <option value="no_show" <?= $status === 'no_show' ? 'selected' : '' ?>>No Show</option>
                             </select>
                         </div>
                         <div class="col-4">
@@ -144,22 +163,32 @@ try {
                             </tr>
                         </thead>
                         <tbody>
-                            <?php foreach ($appointments as $appt): ?>
+                            <?php foreach ($appointments as $appt):
+                                $effective_status = $appt['display_status'] ?? $appt['status'];
+                                $is_past = strtotime($appt['appointment_date'] . ' ' . $appt['appointment_time']) < time();
+                                ?>
                                 <tr>
                                     <td>
                                         <?= date('M j, Y', strtotime($appt['appointment_date'])) ?><br>
                                         <small
                                             class="text-muted"><?= date('g:i A', strtotime($appt['appointment_time'])) ?></small>
+                                        <?php if ($is_past && $effective_status === 'scheduled'): ?>
+                                            <span class="badge bg-warning text-dark mt-1">Missed</span>
+                                        <?php endif; ?>
                                     </td>
                                     <td>Dr. <?= htmlspecialchars($appt['doctor_name']) ?></td>
                                     <td><?= htmlspecialchars($appt['specialty']) ?></td>
                                     <td>
                                         <span class="badge bg-<?=
-                                            $appt['status'] === 'scheduled' ? 'primary' :
-                                            ($appt['status'] === 'completed' ? 'success' :
-                                                ($appt['status'] === 'cancelled' ? 'danger' : 'secondary'))
+                                            $effective_status === 'scheduled' ? 'primary' :
+                                            ($effective_status === 'completed' ? 'success' :
+                                                ($effective_status === 'cancelled' ? 'danger' :
+                                                    ($effective_status === 'no_show' ? 'warning' : 'secondary')))
                                             ?>">
-                                            <?= ucfirst($appt['status']) ?>
+                                            <?= ucfirst($effective_status) ?>
+                                            <?php if ($effective_status === 'scheduled' && $is_past): ?>
+                                                (Missed)
+                                            <?php endif; ?>
                                         </span>
                                     </td>
                                     <td>UGX <?= number_format($appt['consultation_fee']) ?></td>
@@ -169,13 +198,13 @@ try {
                                                 class="btn btn-sm btn-outline-primary">
                                                 <i class="fas fa-eye"></i>
                                             </a>
-                                            <?php if ($appt['status'] === 'scheduled'): ?>
+                                            <?php if ($effective_status === 'scheduled' && !$is_past): ?>
                                                 <a href="cancel_appointment.php?id=<?= $appt['id'] ?>"
                                                     class="btn btn-sm btn-outline-danger">
                                                     <i class="fas fa-times"></i>
                                                 </a>
                                             <?php endif; ?>
-                                            <?php if (!empty($appt['meeting_link'])): ?>
+                                            <?php if (!empty($appt['meeting_link']) && $effective_status === 'scheduled' && !$is_past): ?>
                                                 <a href="<?= htmlspecialchars($appt['meeting_link']) ?>" target="_blank"
                                                     class="btn btn-sm btn-outline-success">
                                                     <i class="fas fa-video"></i>

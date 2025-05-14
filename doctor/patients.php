@@ -328,14 +328,16 @@ include '../header.php';
                                                     <div>
                                                         <strong><?= htmlspecialchars($patient['name']) ?></strong>
                                                         <div class="text-muted small d-block d-md-none">ID:
-                                                            <?= $patient['id'] ?></div>
+                                                            <?= $patient['id'] ?>
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </td>
                                             <td>
                                                 <div class="small"><?= htmlspecialchars($patient['email'] ?? 'N/A') ?></div>
                                                 <div class="text-muted small">
-                                                    <?= htmlspecialchars($patient['phone'] ?? 'N/A') ?></div>
+                                                    <?= htmlspecialchars($patient['phone'] ?? 'N/A') ?>
+                                                </div>
                                             </td>
                                             <td class="text-center">
                                                 <span

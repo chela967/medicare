@@ -427,3 +427,4 @@ footer a:hover {
     pointer-events: auto;
     transform: translateY(0);
 }
+.badge.bg-warning { color: #000; }

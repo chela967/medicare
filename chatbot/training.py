@@ -1,32 +1,31 @@
 import google.generativeai as genai
-import json
 import textwrap
-import os # For environment variables
+import os
 from flask import Flask, request, jsonify
-from flask_cors import CORS # Import CORS
+from flask_cors import CORS
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 # ===== CONFIGURATION =====
-# IMPORTANT: Load API key securely, NOT hardcoded! Use environment variables.
-# Example: Set environment variable GOOGLE_API_KEY before running
-GOOGLE_API_KEY = os.getenv("AIzaSyBU0nYJ79vuTX5CbJReS43Ygz96l_zrpgs")
-if not GOOGLE_API_KEY:
-    # Fallback for testing only - replace with your key if needed, but avoid committing it
-    # GOOGLE_API_KEY = "AIzaSy..." # Replace YOUR_KEY_HERE_BUT_USE_ENV_VAR
-    print("❌ WARNING: GOOGLE_API_KEY environment variable not set. Using fallback/placeholder.")
-    # You might want to exit here if the key is essential: exit("API Key not configured.")
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+# For XAMPP localhost URLs (adjust these as needed)
+BOOKING_URL = os.getenv("BOOKING_URL", "http://localhost/medicare/appointment.php")
+PHARMACY_URL = os.getenv("PHARMACY_URL", "http://localhost/medicare/epharmacy.php")
 
-# Training file loading might not be directly applicable for simple API calls,
-# unless you load it once globally for context or modify generate_response
-# TRAINING_FILE = "fine_tune_data.jsonl"
+if not GOOGLE_API_KEY:
+    print("❌ WARNING: GOOGLE_API_KEY environment variable not set.")
+    exit("API Key not configured.")
+
 MODEL_NAME = "gemini-1.5-pro-latest"
 
 # ===== INITIALIZATION =====
 try:
     genai.configure(api_key=GOOGLE_API_KEY)
 except Exception as e:
-     print(f"❌ Error configuring GenerativeAI: {e}")
-     # Handle missing API key or configuration errors appropriately
-     exit(1) # Exit if configuration fails
+    print(f"❌ Error configuring GenerativeAI: {e}")
+    exit(1)
 
 # ===== MODEL INITIALIZATION =====
 def initialize_model():
@@ -54,82 +53,112 @@ def initialize_model():
         print(f"❌ Error initializing model: {e}")
         return None
 
-# --- Initialize the model globally when the app starts ---
 model = initialize_model()
 if not model:
-     print("❌ Exiting due to model initialization failure.")
-     exit(1)
+    exit("❌ Exiting due to model initialization failure.")
 
+# ===== INTENT DETECTION =====
+def detect_intent(question):
+    question_lower = question.lower().strip()
+    
+    appointment_keywords = [
+        "book appointment", "schedule visit", "make appointment",
+        "see doctor", "consult doctor", "set meeting",
+        "medical appointment", "doctor booking", "need appointment",
+        "want to see doctor", "doctor visit", "appointment"
+    ]
+    
+    medicine_keywords = [
+        "buy medicine", "order drugs", "purchase medicine",
+        "get medication", "need pills", "get prescription",
+        "pharmacy order", "refill meds", "order medication",
+        "need drugs", "want medicine", "medicine", "drugs"
+    ]
+    
+    if any(keyword in question_lower for keyword in appointment_keywords):
+        return "appointment"
+    
+    if any(keyword in question_lower for keyword in medicine_keywords):
+        return "medicine"
+    
+    return None
 
 # ===== RESPONSE GENERATION =====
-# Inside the generate_response function in chatbot_api.py
-
-# Inside the generate_response function in chatbot_api.py
-
 def generate_response(question):
-    if not model: return "Model is not initialized."
+    if not model:
+        return "Model is not initialized."
+    
+    intent = detect_intent(question)
+    
+    if intent == "appointment":
+        return {
+            "type": "link",
+            "message": "You can book your appointment here:",
+            "url": BOOKING_URL,
+            "text": "Book Appointment Now"
+        }
+    
+    if intent == "medicine":
+        return {
+            "type": "link",
+            "message": "You can order your medicine here:",
+            "url": PHARMACY_URL,
+            "text": "Order Medicine Now"
+        }
+    
     try:
-        # --- PROMPT MODIFIED FOR EXTREME BREVITY ---
         prompt = textwrap.dedent(f"""\
         You are a medical information assistant AI.
-        **Instructions for your response:**
-        - Provide EXTREMELY concise answers (MAXIMUM 2-3 short sentences or bullet points total).
-        - Use simple, everyday language. Avoid jargon.
-        - Use numbered lists (1., 2.) or dash lists (- ). Do NOT use asterisks (*).
-        - Focus ONLY on the most common symptoms OR primary actions unless asked for more detail. Do not list everything.
-        - ALWAYS include this exact disclaimer at the very end: "Disclaimer: This information is not a substitute for professional medical advice. Always consult a qualified healthcare provider."
-
-        **User's Question:**
+        **Instructions:**
+        - Be extremely concise (2-3 sentences max)
+        - Use simple language
+        - Use lists when appropriate
+        - Include disclaimer
+        
+        **Question:**
         {question}
 
-        **Your Very Brief Answer:**""") # Changed "Answer:" to "Your Very Brief Answer:"
-        # --- END MODIFIED PROMPT ---
+        **Answer:**""")
 
         response = model.generate_content(prompt)
-        # ... (rest of the error checking and response processing remains the same) ...
+        
         if not response.parts:
-             # ... error handling ...
-             return "..." # Appropriate error/blocked message
-
+            return {"type": "text", "content": "Sorry, I couldn't generate a response."}
+            
         response_text = response.text.replace('* ', '- ')
-        return response_text
+        return {"type": "text", "content": response_text}
+        
     except Exception as e:
-        # ... error handling ...
-        return "Sorry, an error occurred while generating the response."
+        print(f"Error: {e}")
+        return {"type": "text", "content": "Sorry, an error occurred."}
 
-# ===== FLASK WEB SERVER SETUP =====
+# ===== FLASK SERVER CONFIGURATION =====
 app = Flask(__name__)
-CORS(app) # Enable CORS for all routes, allowing requests from your PHP frontend
+CORS(app)  # Enable CORS for your XAMPP frontend
 
-@app.route('/chat', methods=['POST']) # Define the API endpoint URL and method
+@app.route('/chat', methods=['POST'])
 def chat_endpoint():
     try:
-        # Get the message from the JSON data sent by JavaScript
         data = request.get_json()
         if not data or 'message' not in data:
-             print("⚠️ Received invalid request data:", data)
-             return jsonify({'error': 'Missing "message" in request body'}), 400 # Bad Request
-
+            return jsonify({'error': 'Invalid request'}), 400
+        
         user_message = data['message']
-        print(f"Received message: {user_message}") # Log received message
-
-        # Generate the response using the Gemini model
-        bot_reply = generate_response(user_message)
-        print(f"Sending reply: {bot_reply}") # Log reply
-
-        # Return the response as JSON
-        return jsonify({'reply': bot_reply})
+        print(f"User message: {user_message}")
+        
+        response = generate_response(user_message)
+        return jsonify(response)
 
     except Exception as e:
-        print(f"❌ Error in /chat endpoint: {e}")
-        # Consider logging the full error e
-        return jsonify({'error': 'An internal server error occurred'}), 500 # Internal Server Error
+        print(f"Server error: {e}")
+        return jsonify({'error': 'Server error'}), 500
 
-
-# ===== RUN THE FLASK SERVER =====
+# ===== XAMPP-SPECIFIC SETTINGS =====
 if __name__ == "__main__":
-    print("🚀 Starting Flask server for Chatbot API...")
-    # Use 0.0.0.0 to make it accessible on your network if needed,
-    # otherwise 127.0.0.1 is safer for local development.
-    # Default Flask port is 5000.
-    app.run(host='127.0.0.1', port=5000, debug=True) # debug=True is helpful for development
+    print("🚀 Starting Medical Chatbot API for XAMPP")
+    print(f"• Booking Page: {BOOKING_URL}")
+    print(f"• Pharmacy Page: {PHARMACY_URL}")
+    
+    # Run on a different port than XAMPP (Apache typically uses 80)
+    # Access this API from your XAMPP PHP files at http://localhost:5000/chat
+    app.run(host='localhost', port=5000, debug=True)

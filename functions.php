@@ -1367,7 +1367,275 @@ function calculateAge($dob)
         return 'N/A';
     }
 }
+function getOrderDetails($order_id, $user_id)
+{
+    global $conn; // Assuming $conn is your database connection from config.php
 
+    $stmt = $conn->prepare("
+        SELECT o.*, pm.name AS payment_method_name 
+        FROM orders o
+        LEFT JOIN payment_methods pm ON o.payment_method_id = pm.id
+        WHERE o.id = ? AND o.user_id = ?
+    ");
+    $stmt->bind_param("ii", $order_id, $user_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+
+    return $result->fetch_assoc();
+}
+
+/**
+ * Get all items for a specific order
+ */
+function getOrderItems($order_id)
+{
+    global $conn;
+
+    $stmt = $conn->prepare("
+        SELECT oi.*, m.name, m.image, m.description
+        FROM order_items oi
+        JOIN medicines m ON oi.medicine_id = m.id
+        WHERE oi.order_id = ?
+    ");
+    $stmt->bind_param("i", $order_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+
+    $items = [];
+    while ($row = $result->fetch_assoc()) {
+        $items[] = $row;
+    }
+
+    return $items;
+}
+function getOrders($user_id)
+{
+    global $conn;
+
+    try {
+        $query = "SELECT o.*, pm.name as payment_method, 
+                 COUNT(oi.id) as item_count, 
+                 SUM(oi.price * oi.quantity) as order_total
+                 FROM orders o
+                 LEFT JOIN payment_methods pm ON o.payment_method_id = pm.id
+                 LEFT JOIN order_items oi ON o.id = oi.order_id
+                 WHERE o.user_id = ?
+                 GROUP BY o.id
+                 ORDER BY o.created_at DESC";
+
+        $stmt = $conn->prepare($query);
+        $stmt->bind_param("i", $user_id);
+        $stmt->execute();
+
+        $result = $stmt->get_result();
+
+        if ($result->num_rows === 0) {
+            return []; // Return empty array if no orders
+        }
+
+        return $result->fetch_all(MYSQLI_ASSOC);
+
+    } catch (Exception $e) {
+        error_log("Order loading failed: " . $e->getMessage());
+        return false;
+    }
+}
+function handlePostRequest()
+{
+    global $conn, $appointment_id, $patient_id, $patient_name;
+
+    // Set JSON header immediately
+    if (!headers_sent()) {
+        header('Content-Type: application/json');
+    }
+
+    $response = ['success' => false];
+    $message_content = trim($_POST['message'] ?? '');
+
+    try {
+        // Validate message
+        if (empty($message_content)) {
+            $response['error'] = "Message cannot be empty";
+            echo json_encode($response);
+            return;
+        }
+
+        // Verify user is authenticated
+        if (!isset($_SESSION['user']) || $_SESSION['user']['role'] !== 'patient') {
+            $response['error'] = "Unauthorized - Please log in";
+            echo json_encode($response);
+            return;
+        }
+
+        // Check DB connection
+        if (!isset($conn) || !($conn instanceof mysqli) || $conn->connect_error) {
+            $response['error'] = "Database connection error";
+            echo json_encode($response);
+            return;
+        }
+
+        // Verify appointment belongs to patient
+        $verify_sql = "SELECT a.id, doc.user_id as doctor_user_id 
+                      FROM appointments a
+                      JOIN doctors doc ON a.doctor_id = doc.id
+                      WHERE a.id = ? AND a.patient_id = ?";
+        $stmt = $conn->prepare($verify_sql);
+        if (!$stmt) {
+            throw new Exception("Prepare failed: " . $conn->error);
+        }
+        $stmt->bind_param("ii", $appointment_id, $patient_id);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $appointment = $result->fetch_assoc();
+        $stmt->close();
+
+        if (!$appointment) {
+            $response['error'] = "Invalid appointment";
+            echo json_encode($response);
+            return;
+        }
+
+        // Start transaction
+        $conn->begin_transaction();
+
+        // Insert message
+        $insert_sql = "INSERT INTO messages (appointment_id, sender_id, recipient_id, message, created_at) 
+                       VALUES (?, ?, ?, ?, NOW())";
+        $stmt = $conn->prepare($insert_sql);
+        if (!$stmt) {
+            throw new Exception("Prepare failed: " . $conn->error);
+        }
+        $stmt->bind_param("iiis", $appointment_id, $patient_id, $appointment['doctor_user_id'], $message_content);
+        if (!$stmt->execute()) {
+            throw new Exception("Execute failed: " . $stmt->error);
+        }
+        $stmt->close();
+
+        // Create notification
+        $notification_title = "New Message from Patient";
+        $notification_message = "Message from " . htmlspecialchars($patient_name) . " regarding appointment #" . $appointment_id;
+        $type = 'message'; // Variable for the type
+
+        // Check if link column exists
+        $link_column_exists = false;
+        $result = $conn->query("SHOW COLUMNS FROM `notifications` LIKE 'link'");
+        if ($result && $result->num_rows > 0) {
+            $link_column_exists = true;
+        }
+        if ($result)
+            $result->free();
+
+        if ($link_column_exists) {
+            $notification_sql = "INSERT INTO notifications (user_id, title, message, type, link, created_at) 
+                               VALUES (?, ?, ?, ?, ?, NOW())";
+            $stmt = $conn->prepare($notification_sql);
+            if (!$stmt) {
+                throw new Exception("Prepare failed: " . $conn->error);
+            }
+            $link = "doctor/message_patient.php?appointment_id=" . $appointment_id;
+            $stmt->bind_param("issss", $appointment['doctor_user_id'], $notification_title, $notification_message, $type, $link);
+        } else {
+            $notification_sql = "INSERT INTO notifications (user_id, title, message, type, created_at) 
+                               VALUES (?, ?, ?, ?, NOW())";
+            $stmt = $conn->prepare($notification_sql);
+            if (!$stmt) {
+                throw new Exception("Prepare failed: " . $conn->error);
+            }
+            $stmt->bind_param("isss", $appointment['doctor_user_id'], $notification_title, $notification_message, $type);
+        }
+
+        if (!$stmt->execute()) {
+            throw new Exception("Execute failed: " . $stmt->error);
+        }
+        $stmt->close();
+
+        // Commit transaction
+        $conn->commit();
+
+        $response['success'] = true;
+        echo json_encode($response);
+
+    } catch (Exception $e) {
+        // Rollback on error
+        if (isset($conn) && $conn instanceof mysqli && $conn->ping()) {
+            $conn->rollback();
+        }
+
+        error_log("Message Doctor Error: " . $e->getMessage());
+        $response['error'] = "Failed to send message";
+        echo json_encode($response);
+    }
+}
+if (!function_exists('getStatusBadgeClass')) {
+    function getStatusBadgeClass($status)
+    {
+        switch (strtolower($status ?? '')) { // Use ?? for safety if $status might be null
+            case 'scheduled':
+                return 'primary';
+            case 'confirmed': // Example, if you add this status
+                return 'info';
+            case 'completed':
+                return 'success';
+            case 'cancelled':
+                return 'danger';
+            case 'no_show':
+                return 'dark';
+            case 'pending': // Example for other contexts if needed
+                return 'warning';
+            default:
+                return 'secondary'; // Default fallback color
+        }
+    }
+}
+if (!function_exists('getDoctorNotifications')) {
+    /**
+     * Fetches notifications for a specific user.
+     *
+     * @param int $user_id The ID of the user (doctor) whose notifications to fetch.
+     * @param mysqli $conn The database connection object.
+     * @param int $limit The maximum number of notifications to fetch.
+     * @return array An array of notifications, or an empty array on failure/no notifications.
+     */
+    function getDoctorNotifications($user_id, $conn, $limit = 20) {
+        if (!$conn || $conn->connect_error) {
+            error_log("getDoctorNotifications: DB connection error.");
+            return [];
+        }
+
+        $notifications = [];
+        // The notifications table stores notifications for a specific user_id.
+        // We assume the user_id in the notifications table IS the doctor's user_id.
+        $sql = "SELECT id, user_id, title, message, type, link, is_read, created_at
+                FROM notifications
+                WHERE user_id = ?
+                ORDER BY created_at DESC
+                LIMIT ?";
+
+        $stmt = $conn->prepare($sql);
+        if (!$stmt) {
+            error_log("getDoctorNotifications: Prepare failed: " . $conn->error);
+            return [];
+        }
+
+        $stmt->bind_param("ii", $user_id, $limit);
+
+        if (!$stmt->execute()) {
+            error_log("getDoctorNotifications: Execute failed: " . $stmt->error);
+            $stmt->close();
+            return [];
+        }
+
+        $result = $stmt->get_result();
+        while ($row = $result->fetch_assoc()) {
+            // Sanitize data fetched from DB before adding to array (optional, but good practice)
+            // Example: $row['title'] = htmlspecialchars($row['title']);
+            $notifications[] = $row;
+        }
+        $stmt->close();
+
+        return $notifications;
+    }
+}
 
 
 ?>

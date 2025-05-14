@@ -101,7 +101,24 @@ if (file_exists($actualFilePathOnDisk)) {
     // You still need to manually create the js folder and empty script.js file
 }
 ?>
+<script>
+    // Make notification clicks more responsive
+    document.querySelectorAll('.list-group-item-action').forEach(item => {
+        item.addEventListener('click', function (e) {
+            // Add visual feedback
+            this.style.transform = 'scale(0.98)';
+            setTimeout(() => {
+                this.style.transform = '';
+            }, 200);
 
+            // For unread notifications, you could mark as read via AJAX
+            if (this.classList.contains('bg-light')) {
+                const notifId = this.dataset.id; // You'd need to add data-id attribute
+                // AJAX call to mark as read could go here
+            }
+        });
+    });
+</script>
 </body>
 
 </html>

@@ -2,21 +2,16 @@
 // Start output buffering to prevent header errors
 ob_start();
 
-// ========================
-// Database Configuration
-// ========================
+// Correct format for XAMPP default credentials
 define('DB_HOST', 'localhost');
-define('DB_USER', 'root');
-define('DB_PASS', '');
-define('DB_NAME', 'medicare');
+define('DB_USER', 'root');      // XAMPP default username
+define('DB_PASS', '');          // XAMPP default password (empty)
+define('DB_NAME', 'medicare');  // Your database name
 
-
-// Create database connection
 $conn = new mysqli(DB_HOST, DB_USER, DB_PASS, DB_NAME);
-
-// Check connection
 if ($conn->connect_error) {
-    die("Connection failed: " . $conn->connect_error);
+    error_log("DB Connection failed: " . $conn->connect_error);
+    die("Database maintenance in progress. Please try again later.");
 }
 
 // ========================

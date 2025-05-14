@@ -1,97 +1,134 @@
 <?php
 session_start();
-require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/config.php';
 
-if (!isset($_SESSION['user']) || $_SESSION['user']['role'] !== 'patient') {
-    header("Location: ../auth.php");
+// Check if user is logged in as patient
+if (!isset($_SESSION['user']) || ($_SESSION['user']['role'] ?? '') !== 'patient') {
+    header("Location: login.php");
     exit;
 }
 
+// Validate order ID
 if (!isset($_GET['id']) || !is_numeric($_GET['id'])) {
+    $_SESSION['flash_message'] = ['type' => 'danger', 'text' => 'Invalid order ID'];
     header("Location: my_orders.php");
     exit;
 }
 
 $order_id = (int) $_GET['id'];
-$patient_id = $_SESSION['user']['id'];
+$patient_id = (int) ($_SESSION['user']['id'] ?? 0);
 
-// Verify order belongs to patient and is cancellable
-$sql = "SELECT o.* 
-        FROM orders o
-        WHERE o.id = ? AND o.user_id = ? 
-        AND o.status IN ('pending', 'processing')";
+// Initialize variables
+$order = [];
+$error = '';
+$conn = null;
 
-$stmt = $mysqli->prepare($sql);
-$stmt->bind_param("ii", $order_id, $patient_id);
-$stmt->execute();
-$order = $stmt->get_result()->fetch_assoc();
-$stmt->close();
+try {
+    // Create database connection
+    $conn = new mysqli(DB_HOST, DB_USER, DB_PASS, DB_NAME);
 
-if (!$order) {
-    $_SESSION['flash_message'] = ['type' => 'danger', 'text' => 'Order cannot be cancelled or does not exist'];
+    if ($conn->connect_error) {
+        throw new Exception("Database connection failed: " . $conn->connect_error);
+    }
+
+    // Verify order belongs to patient and is cancellable
+    $sql = "SELECT o.* 
+            FROM orders o
+            WHERE o.id = ? AND o.user_id = ? 
+            AND o.status IN ('pending', 'processing')";
+
+    $stmt = $conn->prepare($sql);
+    if (!$stmt) {
+        throw new Exception("Prepare failed: " . $conn->error);
+    }
+
+    $stmt->bind_param("ii", $order_id, $patient_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $order = $result->fetch_assoc();
+    $stmt->close();
+
+    if (!$order) {
+        $_SESSION['flash_message'] = [
+            'type' => 'danger',
+            'text' => 'Order cannot be cancelled or does not exist'
+        ];
+        header("Location: my_orders.php");
+        exit;
+    }
+
+    // Handle form submission
+    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        $cancellation_reason = trim($_POST['cancellation_reason'] ?? '');
+
+        if (empty($cancellation_reason)) {
+            $error = "Please provide a cancellation reason";
+        } else {
+            // Start transaction
+            $conn->begin_transaction();
+
+            try {
+                // 1. Update order status
+                $update_sql = "UPDATE orders 
+                               SET status = 'cancelled', 
+                                   cancellation_reason = ?, 
+                                   cancelled_at = NOW() 
+                               WHERE id = ?";
+                $stmt = $conn->prepare($update_sql);
+                $stmt->bind_param("si", $cancellation_reason, $order_id);
+                $stmt->execute();
+                $stmt->close();
+
+                // 2. Restore medicine quantities
+                $restore_sql = "UPDATE medicines m
+                                JOIN order_items oi ON m.id = oi.medicine_id
+                                SET m.stock = m.stock + oi.quantity
+                                WHERE oi.order_id = ?";
+                $stmt = $conn->prepare($restore_sql);
+                $stmt->bind_param("i", $order_id);
+                $stmt->execute();
+                $stmt->close();
+
+                // 3. Create notification
+                $notification_sql = "INSERT INTO notifications 
+                                    (user_id, title, message, type) 
+                                    VALUES (1, 'Order Cancelled', 
+                                    CONCAT('Order #', ?, ' was cancelled by customer'), 'order')";
+                $stmt = $conn->prepare($notification_sql);
+                $stmt->bind_param("i", $order_id);
+                $stmt->execute();
+                $stmt->close();
+
+                // Commit transaction
+                $conn->commit();
+
+                $_SESSION['flash_message'] = [
+                    'type' => 'success',
+                    'text' => 'Order cancelled successfully'
+                ];
+                header("Location: my_orders.php");
+                exit;
+
+            } catch (Exception $e) {
+                $conn->rollback();
+                error_log("Order Cancellation Error: " . $e->getMessage());
+                $error = "Failed to cancel order. Please try again.";
+            }
+        }
+    }
+
+} catch (Exception $e) {
+    error_log("System Error: " . $e->getMessage());
+    $_SESSION['flash_message'] = [
+        'type' => 'danger',
+        'text' => 'A system error occurred. Please try again later.'
+    ];
     header("Location: my_orders.php");
     exit;
 }
 
-// Handle form submission
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $cancellation_reason = trim($_POST['cancellation_reason'] ?? '');
-
-    if (empty($cancellation_reason)) {
-        $error = "Please provide a cancellation reason";
-    } else {
-        // Start transaction
-        $mysqli->begin_transaction();
-
-        try {
-            // Update order status
-            $update_sql = "UPDATE orders 
-                           SET status = 'cancelled', cancellation_reason = ?, cancelled_at = NOW() 
-                           WHERE id = ?";
-            $stmt = $mysqli->prepare($update_sql);
-            $stmt->bind_param("si", $cancellation_reason, $order_id);
-            $stmt->execute();
-            $stmt->close();
-
-            // Restore product quantities (example)
-            $restore_sql = "UPDATE products p
-                            JOIN order_items oi ON p.id = oi.product_id
-                            SET p.stock_quantity = p.stock_quantity + oi.quantity
-                            WHERE oi.order_id = ?";
-            $stmt = $mysqli->prepare($restore_sql);
-            $stmt->bind_param("i", $order_id);
-            $stmt->execute();
-            $stmt->close();
-
-            // Send notification to admin (simplified example)
-            $notification_sql = "INSERT INTO notifications (user_id, title, message, type) 
-                                 VALUES (1, 'Order Cancelled', 
-                                        CONCAT('Order #', ?, ' was cancelled by customer'), 'order')";
-            $stmt = $mysqli->prepare($notification_sql);
-            $stmt->bind_param("i", $order_id);
-            $stmt->execute();
-            $stmt->close();
-
-            // Commit transaction
-            $mysqli->commit();
-
-            $_SESSION['flash_message'] = [
-                'type' => 'success',
-                'text' => 'Order cancelled successfully'
-            ];
-            header("Location: my_orders.php");
-            exit;
-
-        } catch (Exception $e) {
-            $mysqli->rollback();
-            error_log("Order Cancellation Error: " . $e->getMessage());
-            $error = "Failed to cancel order. Please try again.";
-        }
-    }
-}
-
 $page_title = "Cancel Order";
-require_once __DIR__ . '/../header.php';
+require_once __DIR__ . '/header.php';
 ?>
 
 <div class="container py-4">
@@ -102,16 +139,16 @@ require_once __DIR__ . '/../header.php';
                     <h5 class="mb-0"><i class="fas fa-times-circle me-2"></i> Cancel Order</h5>
                 </div>
                 <div class="card-body">
-                    <?php if (isset($error)): ?>
+                    <?php if (!empty($error)): ?>
                         <div class="alert alert-danger"><?= htmlspecialchars($error) ?></div>
                     <?php endif; ?>
 
                     <div class="alert alert-warning">
                         <h5 class="alert-heading">Order Details</h5>
                         <p>
-                            <strong>Order #:</strong> <?= $order['id'] ?><br>
-                            <strong>Date:</strong> <?= date('M j, Y', strtotime($order['created_at'])) ?><br>
-                            <strong>Total Amount:</strong> UGX <?= number_format($order['total_amount'], 2) ?>
+                            <strong>Order #:</strong> <?= htmlspecialchars($order['id'] ?? '') ?><br>
+                            <strong>Date:</strong> <?= date('M j, Y', strtotime($order['created_at'] ?? 'now')) ?><br>
+                            <strong>Total Amount:</strong> UGX <?= number_format($order['total_amount'] ?? 0, 2) ?>
                         </p>
                     </div>
 
@@ -149,4 +186,10 @@ require_once __DIR__ . '/../header.php';
     </div>
 </div>
 
-<?php require_once __DIR__ . '/../footer.php'; ?>
+<?php
+// Close connection if it exists
+if ($conn instanceof mysqli) {
+    $conn->close();
+}
+require_once __DIR__ . '/footer.php';
+?>
